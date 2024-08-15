@@ -490,8 +490,6 @@ def export_pdf(html_list):
         'footer-right': 'Page [page] of [topage]',
         'footer-font-size': '10',
         'footer-spacing': '5',
-        'footer-left': '',
-        'footer-line': '',
         'encoding': 'UTF-8',
     }
 
@@ -521,7 +519,7 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
     """
 
     # Add a page break before each section
-    html_content += '<div style="page-break-before: always;"></div>'
+    html_content += '<div style="page-break-after: always;"></div>'
 
     html_content += '<div style="padding-top: 1cm; padding-right: 0cm; padding-bottom: 1cm; padding-left: 0cm;">'
 
