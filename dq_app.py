@@ -528,7 +528,7 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
 
     # Column 1: Overall Score
     html_content += '<div style="width: 14%; float: left; padding-right: 2%;">'
-    html_content += '<h2>Overall Score</h2>'
+    html_content += '<h3>Overall Score</h3>'
     html_content += '<hr style="border: 1px solid #262730;">'
 
     overall_record_score, overall_patient_score = overall_scores.get(selected_dim, (None, None))
@@ -579,7 +579,7 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
 
     # Column 2: Table Scores
     html_content += '<div style="width: 64%; float: left; padding-right: 0cm;">'
-    html_content += '<h2>Table Scores</h2>'
+    html_content += '<h3>Table Scores</h3>'
     html_content += '<hr style="border: 1px solid #262730;">'
 
     if selected_dim == "Uniqueness":
@@ -619,6 +619,7 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
         <div style="
             background-color: #262730;
             padding: 20px;
+            padding-bottom: 40px;
             border-radius: 10px;
             color: #ffffff;
             height: 100%;
