@@ -462,7 +462,7 @@ def export_pdf(html_list):
     
     # Wrap the HTML content with some padding
     combined_html = f"""
-    <div style="padding-top: 0cm; padding-right: 0cm; padding-bottom: 0cm; padding-left: 0cm;">
+    <div style="padding-top: 0cm; padding-right: 2cm; padding-bottom: 1cm; padding-left: 2cm;">
         {combined_html}
     </div>
     """
@@ -682,6 +682,8 @@ render_expander(selected_dim)
 html_list = []
 for dim in ['Uniqueness', 'Completeness', 'Validity']:
     html_list.append(render_main_panel_to_html(dim, dfs, overall_scores, num_patients, num_variables))
+
+html_list = ["<div>Test Content</div>"]
 
 # Display the selected dimension
 render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_variables)
