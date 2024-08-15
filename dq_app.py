@@ -644,6 +644,12 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
         img_data = plot_to_base64(fig_barh)
         html_content += f'<img src="{img_data}" alt="Validity Chart" style="width: 100%;">'
 
+    elif selected_dim == "Accuracy":
+        df_accuracy, _, _, _ = dfs[selected_dim]
+        fig_barh = plot_barh(df_accuracy, selected_dim, f'Patient {selected_dim}')
+        img_data = plot_to_base64(fig_barh)
+        html_content += f'<img src="{img_data}" alt="Accuracy Chart" style="width: 100%;">'
+
     html_content += '</div>'
 
     html_content += '</div>'
