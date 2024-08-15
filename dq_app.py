@@ -460,7 +460,7 @@ def export_pdf(html_list):
     """Combine HTML content from all pages into a single PDF."""
     combined_html = "\n".join(html_list)
     
-    # Add padding to the entire HTML content
+    # Wrap the HTML content with some padding
     combined_html = f"""
     <div style="padding-top: 0cm; padding-right: 2cm; padding-bottom: 1cm; padding-left: 2cm;">
         {combined_html}
@@ -473,18 +473,13 @@ def export_pdf(html_list):
     # Add the date prefix to the filename
     pdf_filename = f"{date_prefix}_data_quality_report.pdf"
 
-    # # Path to wkhtmltopdf executable (specify if not found automatically)
-    # path_wkhtmltopdf = '/usr/local/bin/wkhtmltopdf'  # Adjust this path as needed
-    # config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
-
     # Try using the wkhtmltopdf-binary included with the package
     try:
         config = pdfkit.configuration()  # No need to specify the path
     except Exception as e:
         raise OSError("wkhtmltopdf not found and could not be configured automatically.") from e
 
-    
-    # PDF options to set the layout to landscape
+    # PDF options to set the layout to landscape and include page numbers in the footer
     options = {
         'page-size': 'A4',
         'orientation': 'Landscape',
@@ -495,8 +490,12 @@ def export_pdf(html_list):
         'footer-right': 'Page [page] of [topage]',
         'footer-font-size': '10',
         'footer-spacing': '5',
+        'footer-left': '',
+        'footer-line': '',
+        'encoding': 'UTF-8',
     }
 
+    # Generate the PDF with pdfkit
     pdfkit.from_string(combined_html, pdf_filename, configuration=config, options=options)
 
     return pdf_filename
