@@ -1,5 +1,6 @@
 streamlit
 pandas
+wkhtmltopdf-binary
 pdfkit
 plotly
 datetime
