@@ -462,7 +462,7 @@ def export_pdf(html_list):
     
     # Wrap the HTML content with some padding
     combined_html = f"""
-    <div style="padding-top: 0cm; padding-right: 2cm; padding-bottom: 1cm; padding-left: 2cm;">
+    <div style="padding-top: 0cm; padding-right: 0cm; padding-bottom: 0cm; padding-left: 0cm;">
         {combined_html}
     </div>
     """
