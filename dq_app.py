@@ -686,7 +686,7 @@ for dim in ['Uniqueness', 'Completeness', 'Validity']:
 html_list = ["<div>Test Content</div>"]
 
 html_list = []
-for dim in ['Uniqueness']:
+for dim in ['Completeness']:
     html_list.append(render_main_panel_to_html(dim, dfs, overall_scores, num_patients, num_variables))
 
 # Display the selected dimension
