@@ -473,9 +473,16 @@ def export_pdf(html_list):
     # Add the date prefix to the filename
     pdf_filename = f"{date_prefix}_data_quality_report.pdf"
 
-    # Path to wkhtmltopdf executable (specify if not found automatically)
-    path_wkhtmltopdf = '/usr/local/bin/wkhtmltopdf'  # Adjust this path as needed
-    config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
+    # # Path to wkhtmltopdf executable (specify if not found automatically)
+    # path_wkhtmltopdf = '/usr/local/bin/wkhtmltopdf'  # Adjust this path as needed
+    # config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
+
+    # Try using the wkhtmltopdf-binary included with the package
+    try:
+        config = pdfkit.configuration()  # No need to specify the path
+    except Exception as e:
+        raise OSError("wkhtmltopdf not found and could not be configured automatically.") from e
+
     
     # PDF options to set the layout to landscape
     options = {
