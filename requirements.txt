@@ -2,7 +2,6 @@ streamlit
 pandas
 pdfkit
 plotly
-os
 base64
 datetime
 openpyxl
