@@ -1,6 +1,8 @@
 streamlit
 pandas
-altair
+pdfkit
 plotly
+os
+base64
 datetime
 openpyxl
