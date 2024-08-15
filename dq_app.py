@@ -6,7 +6,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import pdfkit
-import os
 import plotly.io as pio
 import base64
 import datetime
