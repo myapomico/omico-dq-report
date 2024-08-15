@@ -29,8 +29,7 @@ dict_filepath_dim = {
     'Uniqueness': 'data/20240812_u_bool.xlsx',
     'Completeness': 'data/20240814_c_bool.xlsx',
     'Validity': 'data/20240812_v_bool.xlsx',
-    'Accuracy_OE': 'data/20240812_a_oe_bool.xlsx',
-    'Accuracy_RO': ''
+    'Accuracy': 'data/20240816_a_ro_bool.xlsx',
 }
 
 ##############################
@@ -46,14 +45,16 @@ def load_data(filepath):
 def plot_donut_plotly(score, title, selected_dim):
     """Create a donut chart using Plotly Express, with color matching the selected_dim and rounding percentage to 0 decimal."""
     colors = {
-        'Completeness': '#02989E',
         'Uniqueness': '#9E024d',
-        'Validity': '#711abe'
+        'Completeness': '#02989E',
+        'Validity': '#711abe',
+        'Accuracy': '#9e7b01'
     }
     bg_colors = {
-        'Completeness': 'rgba(3, 152, 159, 0.3)',
         'Uniqueness': 'rgba(158, 2, 77, 0.3)',
-        'Validity': 'rgba(113, 26, 190, 0.3)'
+        'Completeness': 'rgba(3, 152, 159, 0.3)',
+        'Validity': 'rgba(113, 26, 190, 0.3)',
+        'Accuracy': 'rgba(158, 123, 1, 0.3)'
     }
 
     dim_color = colors.get(selected_dim, '#999999')
@@ -99,19 +100,22 @@ def plot_donut_plotly(score, title, selected_dim):
 def plot_barh(data, metric, chart_title=None):
     """Create a horizontal bar chart for the specified metric."""
     colors = {
-        'Completeness': '#02989E',
         'Uniqueness': '#9E024d',
-        'Validity': '#711abe'
+        'Completeness': '#02989E',
+        'Validity': '#711abe',
+        'Accuracy': '#9e7b01'
     }
     bg_colors = {
-        'Completeness': 'rgba(3, 152, 159, 0.3)',
         'Uniqueness': 'rgba(158, 2, 77, 0.3)',
-        'Validity': 'rgba(113, 26, 190, 0.3)'
+        'Completeness': 'rgba(3, 152, 159, 0.3)',
+        'Validity': 'rgba(113, 26, 190, 0.3)',
+        'Accuracy': 'rgba(158, 123, 1, 0.3)'
     }
     status_labels = {
-        'Completeness': ('Complete', 'Null'),
         'Uniqueness': ('Unique', 'Duplicate'),
-        'Validity': ('Valid', 'Invalid')
+        'Completeness': ('Complete', 'Null'),
+        'Validity': ('Valid', 'Invalid'),
+        'Accuracy': ('Accurate', 'Inaccurate')
     }
 
     metric_color = colors.get(metric, '#999999')
@@ -295,6 +299,35 @@ def calculate_validity(dfs):
 
     return df_validity, overall_validity, num_patients_validity, num_variables_validity
 
+def calculate_accuracy(dfs):
+    """Calculate accuracy metrics."""
+    # Calculate percentage of cells populated by 1's for each table
+    table_accuracy = {}
+    for sheet_name, df in dfs.items():
+        df = df.set_index('PNum')
+        accuracy_percentage = (df.sum().sum() / df.size) * 100
+        table_accuracy[sheet_name] = accuracy_percentage
+
+    # Convert dictionary to DataFrame
+    df_accuracy = pd.DataFrame(list(table_accuracy.items()), columns=['Table', 'Accuracy'])
+
+    # Rename variables with datasheet as prefix and concatenate all dataframes
+    df_boolean = pd.concat(
+        [df.set_index('PNum').rename(columns=lambda col: f"{sheet_name}.{col}") for sheet_name, df in dfs.items()],
+        axis=1
+    ).fillna(0)
+
+    # Calculate overall accuracy
+    overall_accuracy = (df_boolean.sum().sum() / df_boolean.size) * 100
+
+    # Calculate total number of patients
+    num_patients_accuracy = df_boolean.shape[0]
+
+    # Calculate total number of variables
+    num_variables_accuracy = df_boolean.shape[1]
+
+    return df_accuracy, overall_accuracy, num_patients_accuracy, num_variables_accuracy
+
 def render_sidebar():
     with st.sidebar:
         st.title('☑️ Data Quality Report')
@@ -305,12 +338,8 @@ def render_sidebar():
         if selected_dataset == 'MoST (WIP)':
             st.warning("We are working hard on preparing the report for MoST dataset, stay tuned!")
 
-        dim_list = ['Uniqueness', 'Completeness', 'Validity', 'Accuracy (WIP)']
+        dim_list = ['Uniqueness', 'Completeness', 'Validity', 'Accuracy']
         selected_dim = st.selectbox('Select a dimension', dim_list)
-
-        if selected_dim == 'Accuracy (WIP)':
-            st.warning("We are working hard on preparing the Accuracy report, stay tuned!")
-            st.selectbox('Select a subdimension', ['Order of Events', 'Range and Outliers'])
 
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("<hr>", unsafe_allow_html=True)
@@ -332,6 +361,10 @@ def render_expander(selected_dim):
             "Validity": '''
                 <span style="color: #923bdf; font-weight: bold;">Validity</span> assesses whether the data conforms to predefined formats, rules, or constraints, ensuring it is accurate and usable according to the defined standards.
                 <br><br>More details: [Confluence](https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Validity)
+            ''',
+            "Accuracy": '''
+                <span style="color: #9e7b01; font-weight: bold;">Accuracy</span> evaluates the correctness of the data in relation to the real-world or source information it represents, ensuring it is reliable and precise.
+                <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Accuracy">Confluence</a>
             '''
         }
         st.write(explanations.get(selected_dim, "Explanation not available."), unsafe_allow_html=True)
@@ -416,6 +449,9 @@ def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_varia
         elif selected_dim == "Validity":
             df_validity, _, _, _ = dfs[selected_dim]
             st.plotly_chart(plot_barh(df_validity, selected_dim, f'Patient {selected_dim}'))
+        elif selected_dim == "Accuracy":
+            df_accuracy, _, _, _ = dfs[selected_dim]
+            st.plotly_chart(plot_barh(df_accuracy, selected_dim, f'Patient {selected_dim}'))
 
     with col3:
         # num_variables = dfs[selected_dim][0].shape[1] if selected_dim in ["Completeness", "Validity"] else 'n/a'
@@ -555,6 +591,10 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
         "Validity": '''
             <span style="color: #711abe; font-weight: bold;">Validity</span> assesses whether the data conforms to predefined formats, rules, or constraints, ensuring it is accurate and usable according to the defined standards.
             <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Validity">Confluence</a>
+        ''',
+        "Accuracy": '''
+            <span style="color: #9e7b01; font-weight: bold;">Accuracy</span> evaluates the correctness of the data in relation to the real-world or source information it represents, ensuring it is reliable and precise.
+            <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Accuracy">Confluence</a>
         '''
     }
     
@@ -650,28 +690,32 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
 dfs = {
     'Uniqueness': calculate_uniqueness(load_data(dict_filepath_dim['Uniqueness'])),
     'Completeness': calculate_completeness(load_data(dict_filepath_dim['Completeness'])),
-    'Validity': calculate_validity(load_data(dict_filepath_dim['Validity']))
+    'Validity': calculate_validity(load_data(dict_filepath_dim['Validity'])),
+    'Accuracy': calculate_accuracy(load_data(dict_filepath_dim['Accuracy']))
 }
 
 # Precompute overall scores
 overall_scores = {
     'Uniqueness': (dfs['Uniqueness'][2], dfs['Uniqueness'][3]),
     'Completeness': (None, dfs['Completeness'][1]),
-    'Validity': (None, dfs['Validity'][1])
+    'Validity': (None, dfs['Validity'][1]),
+    'Accuracy': (None, dfs['Accuracy'][1])
 }
 
 # Precompute number of patients
 num_patients = {
     'Uniqueness': dfs['Uniqueness'][4],
     'Completeness': dfs['Completeness'][2],
-    'Validity': dfs['Validity'][2]
+    'Validity': dfs['Validity'][2],
+    'Accuracy': dfs['Accuracy'][2]
 }
 
 # Precompute number of variables
 num_variables = {
     'Uniqueness': dfs['Uniqueness'][5],
     'Completeness': dfs['Completeness'][3],
-    'Validity': dfs['Validity'][3]
+    'Validity': dfs['Validity'][3],
+    'Accuracy': dfs['Accuracy'][3]
 }
 
 # Render the sidebar and expander
@@ -697,7 +741,7 @@ html_list = [
     </div>
     """
 ]
-for dim in ['Uniqueness', 'Completeness', 'Validity']:
+for dim in ['Uniqueness', 'Completeness', 'Validity', 'Accuracy']:
     html_list.append(render_main_panel_to_html(dim, dfs, overall_scores, num_patients, num_variables))
 
 # Display the selected dimension
