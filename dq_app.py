@@ -679,14 +679,25 @@ selected_dim = render_sidebar()
 render_expander(selected_dim)
 
 # Capture HTML from each page
-html_list = []
+html_list = [
+    """
+    <div style="width: 100%; padding: 20px; font-family: Arial, sans-serif;">
+        <h1 style="text-align: center; color: #434343; font-size: 80px; margin-bottom: 40px; padding-top: 160px;">
+            Data Quality Report
+        </h1>
+        <p style="text-align: center; font-size: 18px; margin-bottom: 20px;">
+            This report provides a high-level overview of the data quality dimensions across various data tables available in CaSP/MoST Progeny.
+        </p>
+        <div style="text-align: center; font-size: 16px; margin-top: 50px;">
+            <p><strong>Version:</strong> 0.1.1</p>
+            <p><strong>Updated:</strong> 15/08/2024</p>
+            <p><strong>Author:</strong> Melvyn Yap</p>
+            <p><strong>Email:</strong> <a href="mailto:m.yap@omico.org.au">m.yap@omico.org.au</a></p>
+        </div>
+    </div>
+    """
+]
 for dim in ['Uniqueness', 'Completeness', 'Validity']:
-    html_list.append(render_main_panel_to_html(dim, dfs, overall_scores, num_patients, num_variables))
-
-html_list = ["<div>Test Content</div>"]
-
-# html_list = []
-for dim in ['Completeness']:
     html_list.append(render_main_panel_to_html(dim, dfs, overall_scores, num_patients, num_variables))
 
 # Display the selected dimension
