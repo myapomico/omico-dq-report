@@ -2,11 +2,14 @@
 # Import necessary libraries
 ##############################
 
-import pandas as pd
-import altair as alt
 import streamlit as st
+import pandas as pd
 import plotly.express as px
-from datetime import datetime
+import pdfkit
+import os
+import plotly.io as pio
+import base64
+import datetime
 
 ##############################
 # Page configuration
@@ -16,9 +19,8 @@ st.set_page_config(
     page_title="Data Quality Report",
     page_icon="☑️",
     layout="wide",
-    initial_sidebar_state="expanded")
-
-alt.themes.enable("dark")
+    initial_sidebar_state="expanded"
+)
 
 ##############################
 # Specify input data
@@ -26,7 +28,7 @@ alt.themes.enable("dark")
 
 dict_filepath_dim = {
     'Uniqueness': 'data/20240812_u_bool.xlsx',
-    'Completeness': 'data/20240812_c_bool.xlsx',
+    'Completeness': 'data/20240814_c_bool.xlsx',
     'Validity': 'data/20240812_v_bool.xlsx',
     'Accuracy_OE': 'data/20240812_a_oe_bool.xlsx',
     'Accuracy_RO': ''
@@ -37,553 +39,577 @@ dict_filepath_dim = {
 ##############################
 
 @st.cache_data
-def load_data(dict_filepath, str_dim):
-    filepath_data = dict_filepath[str_dim]
-    excel_file = pd.ExcelFile(filepath_data)
-    dict_out = {}
-    for sheet_name in excel_file.sheet_names:
-        dict_out[sheet_name] = pd.read_excel(filepath_data, sheet_name=sheet_name)
-    return dict_out
+def load_data(filepath):
+    """Load data from the specified Excel file."""
+    excel_file = pd.ExcelFile(filepath)
+    return {sheet_name: pd.read_excel(filepath, sheet_name=sheet_name) for sheet_name in excel_file.sheet_names}
 
-def plot_donut(input_response, input_text):
-    if input_text == 'Uniqueness':
-        chart_color = ['#9E024d', '#5a012c']
-    elif input_text == 'Completeness':
-        chart_color = ['#03989f', '#005458']
-    elif input_text == 'Validity':
-        chart_color = ['#54019e', '#32005f']
-    elif 'Accuracy' in input_text:
-        chart_color = ['#9e7b01', '#584500']
-    else:
-        chart_color = ['#ffffff', '#999999']
-    
-    source = pd.DataFrame({
-        "Dimension": ['', input_text],
-        "Score (%)": [100-input_response, input_response]
+def plot_donut_plotly(score, title, selected_dim):
+    """Create a donut chart using Plotly Express, with color matching the selected_dim and rounding percentage to 0 decimal."""
+    colors = {
+        'Completeness': '#02989E',
+        'Uniqueness': '#9E024d',
+        'Validity': '#711abe'
+    }
+    bg_colors = {
+        'Completeness': 'rgba(3, 152, 159, 0.3)',
+        'Uniqueness': 'rgba(158, 2, 77, 0.3)',
+        'Validity': 'rgba(113, 26, 190, 0.3)'
+    }
+
+    dim_color = colors.get(selected_dim, '#999999')
+
+    # Create a DataFrame for the data
+    df = pd.DataFrame({
+        'Metric': ['Qualified', 'Non-qualified'],
+        'Score': [score, 100 - score]
     })
-    source_bg = pd.DataFrame({
-        "Dimension": ['', input_text],
-        "Score (%)": [100, 0]
-    })
-    
-    plot = alt.Chart(source).mark_arc(innerRadius=45, cornerRadius=25).encode(
-        theta="Score (%)",
-        color= alt.Color("Dimension:N",
-                      scale=alt.Scale(
-                          domain=[input_text, ''],
-                          range=chart_color),
-                      legend=None),
-    ).properties(width=130, height=130)
-    
-    text = plot.mark_text(
-        align='center', color="#29b5e8", 
-        font="Lato", fontSize=32, fontWeight=700, fontStyle="italic"
-        ).encode(text=alt.value(f'{round(input_response)} %'))
-    plot_bg = alt.Chart(source_bg).mark_arc(innerRadius=45, cornerRadius=20).encode(
-        theta="Score (%)",
-        color= alt.Color("Dimension:N",
-                      scale=alt.Scale(
-                          domain=[input_text, ''],
-                          range=chart_color),
-                      legend=None),
-    ).properties(width=130, height=130)
-    return plot_bg + plot + text
 
-def plot_barh(data, tablename='insert_tablename', metric=''):
-    if metric == 'Completeness':
-        metric_colour = '#02989E'
-        status_positive = 'Complete'
-        status_negative = 'Null'
-    elif metric == 'Uniqueness':
-        metric_colour = '#9E024d'
-        status_positive = 'Unique'
-        status_negative = 'Duplicate'
-    elif metric == 'Validity':
-        metric_colour = '#53029e'
-        status_positive = 'Valid'
-        status_negative = 'Invalid'
+    # Create the donut chart
+    fig = px.pie(
+        df,
+        names='Metric',
+        values='Score',
+        hole=0.8,
+        color_discrete_sequence=[dim_color, bg_colors.get(selected_dim, '#333333')]
+    )
 
-    # Summarise the data
+    fig.update_traces(
+        textinfo='none',
+        hovertemplate='<b>%{label}</b><br>Score (%) = %{value:.2f}',  # Custom hover template
+    )
+
+    fig.update_layout(
+        showlegend=False,
+        height=180,
+        width=180,
+        margin=dict(t=0, b=10, l=0, r=0),
+        annotations=[dict(
+            text=f"{score:.0f}%",
+            x=0.5, y=0.5,
+            font_size=40,
+            showarrow=False,
+            font=dict(color=dim_color, family='Arial Black')
+        )],
+        plot_bgcolor='rgba(0,0,0,0)',
+        paper_bgcolor='rgba(0,0,0,0)'
+    )
+
+    return fig
+
+def plot_barh(data, metric, chart_title=None):
+    """Create a horizontal bar chart for the specified metric."""
+    colors = {
+        'Completeness': '#02989E',
+        'Uniqueness': '#9E024d',
+        'Validity': '#711abe'
+    }
+    bg_colors = {
+        'Completeness': 'rgba(3, 152, 159, 0.3)',
+        'Uniqueness': 'rgba(158, 2, 77, 0.3)',
+        'Validity': 'rgba(113, 26, 190, 0.3)'
+    }
+    status_labels = {
+        'Completeness': ('Complete', 'Null'),
+        'Uniqueness': ('Unique', 'Duplicate'),
+        'Validity': ('Valid', 'Invalid')
+    }
+
+    metric_color = colors.get(metric, '#999999')
+    status_positive, status_negative = status_labels.get(metric, ('Positive', 'Negative'))
+
+    # Summarize data
     data_summary = data.copy()
-    if metric == 'Uniqueness':
-        data_summary.columns.values[1] = status_positive
-    elif metric == 'Completeness' or metric == 'Validity':
-        data_summary.rename(columns={metric: status_positive}, inplace=True)
+    data_summary.columns = [status_positive if col != 'Table' else col for col in data.columns]
     data_summary[status_negative] = 100 - data_summary[status_positive]
     data_summary = data_summary.melt(id_vars='Table', var_name='Status', value_name='Percentage')
 
-    # Create a horizontal bar chart with a single color
+    # Set the chart title
+    if chart_title is None:
+        chart_title = f"{metric} Bar Chart"
+
+    # Create bar chart
     fig = px.bar(
         data_summary, y='Table', x='Percentage', 
         color='Status', orientation='h', 
-        color_discrete_sequence=[metric_colour, '#999999']
-        )
+        color_discrete_sequence=[metric_color, bg_colors.get(metric, '#999999')],
+        title=chart_title
+    )
     
-    # Customise appearance
     fig.update_layout(
         xaxis_title=f"{metric} percentage",
         yaxis_title="",
         plot_bgcolor='rgba(0, 0, 0, 0)',
         paper_bgcolor='rgba(0, 0, 0, 0)',
-        font=dict(color='white'),
-        height=250 + (data.shape[0] * 20),
+        font=dict(color='black'),
+        height=200 + (data.shape[0] * 16),
+        margin=dict(l=200, r=10, t=80, b=40), 
         xaxis=dict(
             showgrid=True,
             gridcolor='#444444',
-            color='white'
+            color='black',
+            tickvals=[0, 20, 40, 60, 80],
+            range=[0, 100]
         ),
-        yaxis=dict(
-            color='white'
-        )
+        yaxis=dict(color='black'),
+        barmode='stack'
     )
-    # Invert y-axis
-    fig.update_yaxes(
-        autorange="reversed",
-        ticksuffix="  "  # Add space between y-tick labels and y-axis
-    )
-    # Make the bars stacked
-    fig.update_layout(barmode='stack')
+    fig.update_yaxes(autorange="reversed", ticksuffix="  ")
 
-    # Calculate the right end position of the first category for each column
-    df_first_category = data_summary[data_summary['Status'] == status_positive]
-    for _, row in df_first_category.iterrows():
+    # Add percentage annotations
+    for _, row in data_summary[data_summary['Status'] == status_positive].iterrows():
+        # Determine text color based on bar position (inside bar -> white, outside bar -> black)
+        text_color = "white" if row['Percentage'] > 50 else "black"
         fig.add_annotation(
-            x=row['Percentage'],  # Position at the end of the first stack
+            x=row['Percentage'],
             y=row['Table'],
             text=f"{row['Percentage']:.1f}%",
             showarrow=False,
-            font=dict(size=12, color="white"),
-            xanchor='right',  # Anchor the text to the right
+            font=dict(size=12, color=text_color), 
+            xanchor='right',
             yanchor='middle'
         )
 
     return fig
 
-##############################
-# Sidebar navigation
-##############################
-
-with st.sidebar:
-    st.title('☑️ Data Quality Report')
-
-    dataset_list = ['CaSP', 'MoST (WIP)']
-    selected_dataset = st.selectbox('Select a dataset', dataset_list)
-
-    if selected_dataset == 'MoST (WIP)':
-        st.warning("We are working hard on preparing the report for MoST dataset, stay tuned!")
-
-    dim_list = ['Uniqueness', 'Completeness', 'Validity', 'Accuracy (WIP)']
-    selected_dim = st.selectbox('Select a dimension', dim_list)
-
-    if selected_dim == 'Accuracy (WIP)':
-        st.warning("We are working hard on preparing the Accuracy report, stay tuned!")
-        acc_dim_list = ['Order of Events', 'Range and Outliers']
-        selected_acc_dim = st.selectbox('Select a subdimension', acc_dim_list)
-
-    st.markdown("<br><br>", unsafe_allow_html=True)
-
-with st.sidebar.expander(f"💡 What is {selected_dim}?"):
-    if selected_dim == "Uniqueness":
-        st.write('''
-            <span style="color: #db0069; font-weight: bold;">Uniqueness</span> ensures that each data entry is distinct and not duplicated within the dataset, maintaining the integrity of unique identifiers.
-            <br><br>More details: [Confluence](https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Uniqueness)
-            ''', unsafe_allow_html=True)
-    elif selected_dim == "Completeness":
-        st.write('''
-            <span style="color: #00c9d3; font-weight: bold;">Completeness</span> measures the extent to which all required data elements are present, ensuring that no necessary information is missing.
-            <br><br>More details: [Confluence](https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Completeness)
-            ''', unsafe_allow_html=True)
-    elif selected_dim == "Validity":
-        st.write('''
-            <span style="color: #923bdf; font-weight: bold;">Validity</span> assesses whether the data conforms to predefined formats, rules, or constraints, ensuring it is accurate and usable according to the defined standards.
-            <br><br>More details: [Confluence](https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Validity)
-            ''', unsafe_allow_html=True)
-
-
-##############################
-# Backend calculation
-##############################
-
-dfs_boolean = load_data(dict_filepath_dim, selected_dim)
-
-if selected_dim == "Uniqueness":
-
-    # Calculate percentage of records unique
-    table_record_uniqueness = {}
-    for table, df in dfs_boolean.items():
-        # Calculate the number of unique records (records without duplicates)
-        unique_record_count = df.shape[0] - df.is_duplicate.sum()
-        # Calculate the total number of records
-        total_record_count = df.shape[0]
-        
-        # Initialise the dictionary for the current table if not already initialised
-        if table not in table_record_uniqueness:
-            table_record_uniqueness[table] = {}
-        
-        # Assign values to the dictionary
-        table_record_uniqueness[table]['Unique records'] = unique_record_count
-        table_record_uniqueness[table]['Total records'] = total_record_count
-        table_record_uniqueness[table]['Record uniqueness'] = (unique_record_count / total_record_count) * 100
-
-    # Convert dict to df
-    df_record_uniqueness = pd.DataFrame(table_record_uniqueness).T
-    # Ensure the first two columns are numeric and convert them to int
-    for col in df_record_uniqueness.columns[:2]:
-        df_record_uniqueness[col] = pd.to_numeric(df_record_uniqueness[col], errors='coerce').fillna(0).astype(int)
-
-    # Prepare final table for plotting
-    data_record_uniqueness = df_record_uniqueness.iloc[:,-1].reset_index().rename(columns={'index': 'Table'})
-
-    # Get total number of records that are unique for the entire dataset
-    num_records = df_record_uniqueness['Total records'].sum()
-    overall_record_uniqueness = df_record_uniqueness['Unique records'].sum()/num_records*100
-
-    # Define overall record score
-    overall_record_score = overall_record_uniqueness
-
-    # Calculate percentage of patients unique
+def calculate_uniqueness(dfs):
+    """Calculate uniqueness metrics for records and patients."""
+    record_uniqueness, patient_uniqueness = {}, {}
     table_patient_duplicated_id = {}
-    table_patient_uniqueness = {}
-    for table, df in dfs_boolean.items():
-        # Get list of duplicated patients
+
+    for table, df in dfs.items():
+        # Record uniqueness
+        unique_record_count = df.shape[0] - df['is_duplicate'].sum()
+        total_record_count = df.shape[0]
+        record_uniqueness[table] = {
+            'Unique records': unique_record_count,
+            'Total records': total_record_count,
+            'Record uniqueness': (unique_record_count / total_record_count) * 100
+        }
+
+        # Patient uniqueness
         grouped_df = df.groupby('PNum')['is_duplicate'].sum()
-        patient_duplicated_ids = grouped_df[grouped_df>0].index.tolist()
-        # Assign values to dictionary
+        patient_duplicated_ids = grouped_df[grouped_df > 0].index.tolist()
         table_patient_duplicated_id[table] = patient_duplicated_ids
-        # Calculate the number of unique patients (patients without duplicates)
-        unique_patient_count = (df.groupby('PNum')['is_duplicate'].sum() == 0).sum()
-        # Calculate the total number of patients
+        unique_patient_count = (grouped_df == 0).sum()
         total_patient_count = df['PNum'].nunique()
-        
-        # Initialise the dictionary for the current table if not already initialised
-        if table not in table_patient_uniqueness:
-            table_patient_uniqueness[table] = {}
-        
-        # Assign values to the dictionary
-        table_patient_uniqueness[table]['Unique patients'] = unique_patient_count
-        table_patient_uniqueness[table]['Total patients'] = total_patient_count
-        table_patient_uniqueness[table]['Patient uniqueness'] = (unique_patient_count / total_patient_count) * 100
+        patient_uniqueness[table] = {
+            'Unique patients': unique_patient_count,
+            'Total patients': total_patient_count,
+            'Patient uniqueness': (unique_patient_count / total_patient_count) * 100
+        }
 
-    # Convert dict to df
-    df_patient_uniqueness = pd.DataFrame(table_patient_uniqueness).T
+    # Convert dicts to dataframes
+    df_record_uniqueness = pd.DataFrame(record_uniqueness).T
+    df_patient_uniqueness = pd.DataFrame(patient_uniqueness).T
+
     # Ensure the first two columns are numeric and convert them to int
-    for col in df_patient_uniqueness.columns[:2]:
-        df_patient_uniqueness[col] = pd.to_numeric(df_patient_uniqueness[col], errors='coerce').fillna(0).astype(int)
+    for df in [df_record_uniqueness, df_patient_uniqueness]:
+        df[df.columns[:2]] = df[df.columns[:2]].astype(int)
 
-    # Prepare final table for plotting
-    data_patient_uniqueness = df_patient_uniqueness.iloc[:,-1].reset_index().rename(columns={'index': 'Table'})
+    # Calculate overall record uniqueness
+    overall_record_uniqueness = df_record_uniqueness['Unique records'].sum() / df_record_uniqueness['Total records'].sum() * 100
 
-    # Overall patient uniqueness
-    # Combine all unique patient IDs into a single list
+    # Combine duplicated patient IDs from all tables
     dataset_patient_duplicated_ids = set()
     for patient_ids in table_patient_duplicated_id.values():
         dataset_patient_duplicated_ids.update(patient_ids)
-    dataset_patient_duplicated_ids = list(dataset_patient_duplicated_ids)
 
-    # Count total number of unique patients and overall patient uniqueness
+    # Calculate overall patient uniqueness
     dataset_total_patients = df_patient_uniqueness['Total patients'].max()
-    dataset_unique_patients = dataset_total_patients-len(dataset_patient_duplicated_ids)
-    overall_patient_uniqueness = dataset_unique_patients/dataset_total_patients*100
+    dataset_unique_patients = dataset_total_patients - len(dataset_patient_duplicated_ids)
+    overall_patient_uniqueness = (dataset_unique_patients / dataset_total_patients) * 100
 
-    # Define overall record score
-    overall_patient_score = overall_patient_uniqueness
+    # Calculate total number of patients
+    num_patients_uniqueness = dataset_total_patients
 
-    # Output relevant metadata
-    num_tables = df_record_uniqueness.shape[0]
-    num_patients = dataset_total_patients
+    # Calculate total number of variables
+    num_variables_uniqueness = 'n/a'
 
-elif selected_dim == "Completeness":
+    return df_record_uniqueness, df_patient_uniqueness, overall_record_uniqueness, overall_patient_uniqueness, num_patients_uniqueness, num_variables_uniqueness
 
+def calculate_completeness(dfs):
+    """Calculate completeness metrics."""
     # Calculate percentage of cells populated by 1's for each table
     table_completeness = {}
-    for sheet_name, df in dfs_boolean.items():
+    for sheet_name, df in dfs.items():
         df = df.set_index('PNum')
-        table_completeness[sheet_name] = (df.sum().sum()/df.size)*100
+        completeness_percentage = (df.sum().sum() / df.size) * 100
+        table_completeness[sheet_name] = completeness_percentage
 
     # Convert dictionary to DataFrame
-    data_completeness = pd.DataFrame(list(table_completeness.items()), columns=['Table', 'Completeness'])
+    df_completeness = pd.DataFrame(list(table_completeness.items()), columns=['Table', 'Completeness'])
 
-    # Rename variables with datasheet as prefix
-    dfs_boolean_renamed = []
-    for datasheet, df in dfs_boolean.items():
-        df = df.set_index('PNum')
-        df = df.rename(columns=lambda var: f"{datasheet}.{var}")
-        dfs_boolean_renamed.append(df)
+    # Rename variables with datasheet as prefix and concatenate all dataframes
+    df_boolean = pd.concat(
+        [df.set_index('PNum').rename(columns=lambda col: f"{sheet_name}.{col}") for sheet_name, df in dfs.items()],
+        axis=1
+    ).fillna(0)
 
-    # Concatenate all dataframes
-    df_boolean = pd.concat(dfs_boolean_renamed, axis=1).fillna(0)
+    # Calculate overall completeness
+    overall_completeness = (df_boolean.sum().sum() / df_boolean.size) * 100
 
-    # Calculate percentage of cells populated by 1's
-    overall_completeness = (df_boolean.sum().sum()/df_boolean.size)*100
+    # Calculate total number of patients
+    num_patients_completeness = df_boolean.shape[0]
 
-    # Define overall patient score
-    overall_patient_score = overall_completeness
+    # Calculate total number of variables
+    num_variables_completeness = df_boolean.shape[1]
 
-    overall_record_score = None
+    return df_completeness, overall_completeness, num_patients_completeness, num_variables_completeness
 
-    # Output relevant metadata
-    num_tables = data_completeness.shape[0]
-    num_patients = df_boolean.shape[0]
-    num_records = sum(df.shape[0] for df in dfs_boolean.values())
+def calculate_validity(dfs):
+    """Calculate validity metrics."""
 
-elif selected_dim == "Validity":
-
-    # Assign validity score (0 or 1) per patient
     def validity_per_pat(df, req):
+        df = df.set_index('PNum') != 0
         if req == 'lowerbound':
-            # If all records are valid for each patient
-            df_out = (df.set_index('PNum') != 0).groupby(level=0).all().astype(int)
-        elif req == 'upperbound':
-            # If at least one record is valid for each patient
-            df_out = (df.set_index('PNum') != 0).groupby(level=0).any().astype(int)
+            df_out = df.groupby(level=0).all().astype(int)
+        else:  # 'upperbound' case
+            df_out = df.groupby(level=0).any().astype(int)
         return df_out
-
-    # Binary validity per variable per patient
-    dfs_boolean_patients= {}
-    for table, df in dfs_boolean.items():
-        # df
-        dfs_boolean_patients[table] = validity_per_pat(df, req='lowerbound')
     
-    # Calculate percentage of cells populated by 1's for each table
-    table_validity = {}
-    for sheet_name, df in dfs_boolean_patients.items():
-        table_validity[sheet_name] = (df.sum().sum()/df.size)*100
-
+    # Calculate binary validity per variable per patient for each table
+    dfs_patients = {table: validity_per_pat(df, 'lowerbound') for table, df in dfs.items()}
+    
+    # Calculate percentage of valid cells for each table
+    table_validity = {
+        sheet_name: (df.sum().sum() / df.size) * 100 for sheet_name, df in dfs_patients.items()
+    }
+    
     # Convert dictionary to DataFrame
-    data_validity = pd.DataFrame(list(table_validity.items()), columns=['Table', 'Validity'])
+    df_validity = pd.DataFrame(list(table_validity.items()), columns=['Table', 'Validity'])
 
-    # Rename variables with datasheet as prefix
-    dfs_boolean_patients_renamed = []
-    for datasheet, df in dfs_boolean_patients.items():
-        df = df.rename(columns=lambda var: f"{datasheet}.{var}")
-        dfs_boolean_patients_renamed.append(df)
+    # Rename variables with datasheet as prefix and concatenate all dataframes
+    df_patients_concat = pd.concat(
+        [df.rename(columns=lambda col: f"{sheet_name}.{col}") for sheet_name, df in dfs_patients.items()],
+        axis=1
+    ).fillna(1)
 
-    # Concatenate all dataframes
-    df_boolean_patients = pd.concat(dfs_boolean_patients_renamed, axis=1).fillna(1)
+    # Calculate overall validity percentage
+    overall_validity = (df_patients_concat.sum().sum() / df_patients_concat.size) * 100
 
-    # Calculate percentage of cells populated by 1's
-    overall_validity = (df_boolean_patients.sum().sum()/df_boolean_patients.size)*100
+    # Calculate total number of patients
+    num_patients_validity = df_patients_concat.shape[0]
 
-    # Define overall patient score
-    overall_patient_score = overall_validity
+    # Calculate total number of variables
+    num_variables_validity = df_patients_concat.shape[1]
 
-    overall_record_score = None
+    return df_validity, overall_validity, num_patients_validity, num_variables_validity
 
-    # Output relevant metadata
-    num_tables = data_validity.shape[0]
-    num_patients = df_boolean_patients.shape[0]
-    num_records = sum(df.shape[0] for df in dfs_boolean_patients.values())
+def render_sidebar():
+    with st.sidebar:
+        st.title('☑️ Data Quality Report')
 
+        dataset_list = ['CaSP', 'MoST (WIP)']
+        selected_dataset = st.selectbox('Select a dataset', dataset_list)
 
-##############################
-# Dashboard Main Panel
-##############################
+        if selected_dataset == 'MoST (WIP)':
+            st.warning("We are working hard on preparing the report for MoST dataset, stay tuned!")
 
-col1, col2, col3 = st.columns([1, 4, 1.5], gap='medium')
+        dim_list = ['Uniqueness', 'Completeness', 'Validity', 'Accuracy (WIP)']
+        selected_dim = st.selectbox('Select a dimension', dim_list)
 
-with col1:
+        if selected_dim == 'Accuracy (WIP)':
+            st.warning("We are working hard on preparing the Accuracy report, stay tuned!")
+            st.selectbox('Select a subdimension', ['Order of Events', 'Range and Outliers'])
 
-    st.markdown('#### Overall Score')
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("<hr>", unsafe_allow_html=True)
+
+    return selected_dim
+
+def render_expander(selected_dim):
+    """Render the sidebar expander with explanations."""
+    with st.sidebar.expander(f"💡 What is {selected_dim}?"):
+        explanations = {
+            "Uniqueness": '''
+                <span style="color: #db0069; font-weight: bold;">Uniqueness</span> ensures that each data entry is distinct and not duplicated within the dataset, maintaining the integrity of unique identifiers.
+                <br><br>More details: [Confluence](https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Uniqueness)
+            ''',
+            "Completeness": '''
+                <span style="color: #00c9d3; font-weight: bold;">Completeness</span> measures the extent to which all required data elements are present, ensuring that no necessary information is missing.
+                <br><br>More details: [Confluence](https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Completeness)
+            ''',
+            "Validity": '''
+                <span style="color: #923bdf; font-weight: bold;">Validity</span> assesses whether the data conforms to predefined formats, rules, or constraints, ensuring it is accurate and usable according to the defined standards.
+                <br><br>More details: [Confluence](https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Validity)
+            '''
+        }
+        st.write(explanations.get(selected_dim, "Explanation not available."), unsafe_allow_html=True)
+        
+def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_variables):
+    """Render the main panel with overall and table-specific scores."""
+    col1, col2, col3 = st.columns([1, 4, 1.5], gap='medium')
+
+    with col1:
+        st.markdown("""
+            <h3 style="margin-bottom: 5px;">Overall Scores</h3>
+            <hr style="margin-top: 0; border: 1px solid #333;">
+        """, unsafe_allow_html=True)
+
+        # Retrieve precomputed scores based on selected dimension
+        overall_record_score, overall_patient_score = overall_scores.get(selected_dim, (None, None))
+
+        if overall_record_score:
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f'**Record {selected_dim.lower()}**')
+            st.plotly_chart(plot_donut_plotly(overall_record_score, f"Record {selected_dim}", selected_dim))
+
+        if overall_patient_score:
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f'**Patient {selected_dim.lower()}**')
+            st.plotly_chart(plot_donut_plotly(overall_patient_score, f"Patient {selected_dim}", selected_dim))
+
+    with col2:
+        st.markdown("""
+            <h3 style="margin-bottom: 5px;">Table Scores</h3>
+            <hr style="margin-top: 0; border: 1px solid #333;">
+        """, unsafe_allow_html=True)
+
+        if selected_dim == "Uniqueness":
+            df_record_uniqueness, df_patient_uniqueness, _, _, _, _ = dfs[selected_dim]
+            
+            # Radio button for selecting the type of uniqueness to display with custom styling
+            st.markdown("""
+                <style>
+                .radio-container {
+                    display: flex;
+                    justify-content: center;
+                    gap: 10px;
+                }
+                .radio-container label {
+                    display: inline-block;
+                    padding: 10px 20px;
+                    border-radius: 20px;
+                    border: 2px solid #9E024d;
+                    cursor: pointer;
+                    font-weight: bold;
+                    color: white;
+                }
+                .radio-container input[type="radio"] {
+                    display: none;
+                }
+                .radio-container input[type="radio"]:checked + label {
+                    background-color: #9E024d;
+                    color: white;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+
+            # Adding a non-empty label and hiding it
+            uniqueness_type = st.radio(
+                "Uniqueness Type Selection",
+                ("Record Uniqueness", "Patient Uniqueness"),
+                index=0,
+                key="uniqueness_type",
+                label_visibility="collapsed"  # This hides the label but still satisfies the accessibility requirement
+            )
+
+            # Display one of the two bar charts based on the selected option
+            if uniqueness_type == "Record Uniqueness":
+                st.plotly_chart(plot_barh(df_record_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, uniqueness_type))
+            else:
+                st.plotly_chart(plot_barh(df_patient_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, uniqueness_type))
+
+        elif selected_dim == "Completeness":
+            df_completeness, _, _, _ = dfs[selected_dim]
+            st.plotly_chart(plot_barh(df_completeness, selected_dim, f'Patient {selected_dim}'))
+        elif selected_dim == "Validity":
+            df_validity, _, _, _ = dfs[selected_dim]
+            st.plotly_chart(plot_barh(df_validity, selected_dim, f'Patient {selected_dim}'))
+
+    with col3:
+        # num_variables = dfs[selected_dim][0].shape[1] if selected_dim in ["Completeness", "Validity"] else 'n/a'
+
+        st.markdown(f"""
+            <div style="
+                background-color: #262730;
+                padding: 20px;
+                border-radius: 10px;
+                color: #ffffff;
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                justify-content: flex-start;
+                ">
+                <h3 style="color: white;">Data Selection</h3>
+                <ul>
+                    <li>Source file: <span style="color: orange; word-wrap: break-word; word-break: break-all;">20240515_Quantium_CaSP.xlsx</span></li>
+                    <li>Dataset: <span style="color: orange;">CaSP</span></li>
+                    <li>Patient count: <span style="color: orange;">{"{:,}".format(num_patients[selected_dim])}</span></li>
+                    <li>Table count: <span style="color: orange;">{len(dfs[selected_dim][0])}</span></li>
+                    <li>Variable count: <span style="color: orange;">{num_variables[selected_dim]}</span></li>
+                </ul>
+                <hr>
+                <p><strong>Disclaimer</strong></p>
+                <p>This is a draft report and for INTERNAL USE ONLY. Numbers do not reflect the latest available dataset in Progeny.</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        with st.expander('About', expanded=False):
+            st.write('''
+                This report provides a high-level overview of the data quality dimensions across various data tables available in CaSP/MoST Progeny.
+                - Version: 0.1.1
+                - Updated: 15/08/2024
+                - Author: Melvyn Yap
+                - Email: m.yap@omico.org.au
+            ''')
+
+def export_pdf(html_list):
+    """Combine HTML content from all pages into a single PDF."""
+    combined_html = "\n".join(html_list)
+    
+    # Add padding to the entire HTML content
+    combined_html = f"""
+    <div style="padding-top: 0cm; padding-right: 2cm; padding-bottom: 1cm; padding-left: 2cm;">
+        {combined_html}
+    </div>
+    """
+    
+    # Get the current date in YYYYMMDD format
+    date_prefix = datetime.datetime.now().strftime("%Y%m%d")
+    
+    # Add the date prefix to the filename
+    pdf_filename = f"{date_prefix}_data_quality_report.pdf"
+
+    # Path to wkhtmltopdf executable (specify if not found automatically)
+    path_wkhtmltopdf = '/usr/local/bin/wkhtmltopdf'  # Adjust this path as needed
+    config = pdfkit.configuration(wkhtmltopdf=path_wkhtmltopdf)
+    
+    # PDF options to set the layout to landscape
+    options = {
+        'page-size': 'A4',
+        'orientation': 'Landscape',
+        'margin-top': '1cm',
+        'margin-right': '1cm',
+        'margin-bottom': '1cm',
+        'margin-left': '1cm',
+        'footer-right': 'Page [page] of [topage]',
+        'footer-font-size': '10',
+        'footer-spacing': '5',
+    }
+
+    pdfkit.from_string(combined_html, pdf_filename, configuration=config, options=options)
+
+    return pdf_filename
+
+def plot_to_base64(fig):
+    """Convert a Plotly figure to a base64 encoded image."""
+    img_bytes = pio.to_image(fig, format='png')
+    img_base64 = base64.b64encode(img_bytes).decode('ascii')
+    return f"data:image/png;base64,{img_base64}"
+
+def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, num_variables):
+    """Render the main panel to HTML instead of directly to Streamlit."""
+    # Apply Arial font globally
+    html_content = """
+        <style>
+            body, h4, h5, p, ul, li {
+                font-family: Arial, sans-serif;
+            }
+            body {
+                background-color: #eeeeee;  /* Light grey background */
+            }
+        </style>
+    """
+
+    # Add a page break before each section
+    html_content += '<div style="page-break-before: always;"></div>'
+
+    html_content += '<div style="padding-top: 1cm; padding-right: 0cm; padding-bottom: 1cm; padding-left: 0cm;">'
+
+    # Column 1: Overall Score
+    html_content += '<div style="width: 14%; float: left; padding-right: 2%;">'
+    html_content += '<h2>Overall Score</h2>'
+    html_content += '<hr style="border: 1px solid #262730;">'
+
+    overall_record_score, overall_patient_score = overall_scores.get(selected_dim, (None, None))
 
     if overall_record_score:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f'**Record {selected_dim.lower()}**')
-        donut_chart1 = plot_donut(overall_record_score, selected_dim)
-        st.altair_chart(donut_chart1)
+        html_content += f'<p><strong>Record {selected_dim.lower()}</strong></p>'
+        fig_record = plot_donut_plotly(overall_record_score, f"Record {selected_dim}", selected_dim)
+        img_data = plot_to_base64(fig_record)
+        html_content += f'<img src="{img_data}" alt="Record {selected_dim} Chart" style="width: 100%;">'
 
     if overall_patient_score:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f'**Patient {selected_dim.lower()}**')
-        donut_chart2 = plot_donut(overall_patient_score, selected_dim)
-        st.altair_chart(donut_chart2)
+        html_content += f'<p><strong>Patient {selected_dim.lower()}</strong></p>'
+        fig_patient = plot_donut_plotly(overall_patient_score, f"Patient {selected_dim}", selected_dim)
+        img_data = plot_to_base64(fig_patient)
+        html_content += f'<img src="{img_data}" alt="Patient {selected_dim} Chart" style="width: 100%;">'
+    
+    # Add explanation text at the bottom of Column 1
+    explanations = {
+        "Uniqueness": '''
+            <span style="color: #9E024d; font-weight: bold;">Uniqueness</span> ensures that each data entry is distinct and not duplicated within the dataset, maintaining the integrity of unique identifiers.
+            <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Uniqueness">Confluence</a>
+        ''',
+        "Completeness": '''
+            <span style="color: #02989E; font-weight: bold;">Completeness</span> measures the extent to which all required data elements are present, ensuring that no necessary information is missing.
+            <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Completeness">Confluence</a>
+        ''',
+        "Validity": '''
+            <span style="color: #711abe; font-weight: bold;">Validity</span> assesses whether the data conforms to predefined formats, rules, or constraints, ensuring it is accurate and usable according to the defined standards.
+            <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Validity">Confluence</a>
+        '''
+    }
+    
+    explanation_html = explanations.get(selected_dim, "Explanation not available.")
+    html_content += f'''
+        <div style="
+            margin-top: 20px;
+            background-color: #d9d9d9;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        ">
+            {explanation_html}
+        </div>
+    '''
 
-with col2:
+    html_content += '</div>'
 
-    st.markdown('#### Table Scores')
+    # Column 2: Table Scores
+    html_content += '<div style="width: 64%; float: left; padding-right: 0cm;">'
+    html_content += '<h2>Table Scores</h2>'
+    html_content += '<hr style="border: 1px solid #262730;">'
+
     if selected_dim == "Uniqueness":
+        df_record_uniqueness, df_patient_uniqueness, _, _, _, _ = dfs[selected_dim]
 
-        bar_chart1 = plot_barh(data_record_uniqueness, tablename='table', metric=selected_dim)
-        bar_chart2 = plot_barh(data_patient_uniqueness, tablename='table', metric=selected_dim)
+        # Display Record Uniqueness bar chart
+        fig_barh_record = plot_barh(df_record_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, f'Record {selected_dim}')
+        img_data_record = plot_to_base64(fig_barh_record)
+        html_content += f'<img src="{img_data_record}" alt="Record Uniqueness Chart" style="width: 100%;">'
 
-        # Default to Chart 1
-        if 'selected_chart' not in st.session_state:
-            st.session_state.selected_chart = "chart1"
-
-        # Define button classes based on selected chart
-        chart1_class = "button selected" if st.session_state.selected_chart == "chart1" else "button"
-        chart2_class = "button selected" if st.session_state.selected_chart == "chart2" else "button"
-
-        st.markdown(
-            """
-            <style>
-            .stButton > button {
-                margin-right: 5px;
-                font-size: 16px;
-                padding: 10px 20px;
-                border-radius: 15px;
-                border: none;
-                cursor: pointer;
-            }
-            .stButton > button:hover {
-                background-color: #9e024d; /* Background color on hover */
-                color: #ffffff;
-            }
-            .stButton > button:focus:not(:active) {
-                background-color: #9e024d !important; /* Background color when selected */
-                color: #ffffff;
-            }
-            .stButton > button:active {
-                background-color: #9e024d !important; /* Background color when active */
-                color: #ffffff;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Create button columns
-        button_col1, button_col2 = st.columns([1, 3])
-
-        with button_col1:
-            if st.button(f"Record {selected_dim.lower()}"):
-                st.session_state.selected_chart = "chart1"
-
-        with button_col2:
-            if st.button(f"Patient {selected_dim.lower()}"):
-                st.session_state.selected_chart = "chart2"
-
-        # Render the selected chart
-        if st.session_state.selected_chart == "chart1":
-            st.plotly_chart(bar_chart1)
-        elif st.session_state.selected_chart == "chart2":
-            st.plotly_chart(bar_chart2)
-
-        # Apply the correct CSS class to buttons
-        col1.markdown(f"<style>.stButton > button {{background-color: {'#5a012c' if st.session_state.selected_chart == 'chart1' else '#5a012c'};}}</style>", unsafe_allow_html=True)
-        col2.markdown(f"<style>.stButton > button {{background-color: {'#5a012c' if st.session_state.selected_chart == 'chart2' else '#5a012c'};}}</style>", unsafe_allow_html=True)
+        # Display Patient Uniqueness bar chart
+        fig_barh_patient = plot_barh(df_patient_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, f'Patient {selected_dim}')
+        img_data_patient = plot_to_base64(fig_barh_patient)
+        html_content += f'<img src="{img_data_patient}" alt="Patient Uniqueness Chart" style="width: 100%;">'
 
     elif selected_dim == "Completeness":
+        df_completeness, _, _, _ = dfs[selected_dim]
+        fig_barh = plot_barh(df_completeness, selected_dim, f'Patient {selected_dim}')
+        img_data = plot_to_base64(fig_barh)
+        html_content += f'<img src="{img_data}" alt="Completeness Chart" style="width: 100%;">'
 
-        bar_chart1 = plot_barh(data_completeness, tablename='table', metric=selected_dim)
-
-        # Default to Chart 1
-        if 'selected_chart' not in st.session_state:
-            st.session_state.selected_chart = "chart1"
-
-        # Define button classes based on selected chart
-        chart1_class = "button selected" if st.session_state.selected_chart == "chart1" else "button"
-
-        st.markdown(
-            """
-            <style>
-            .stButton > button {
-                margin-right: 5px;
-                font-size: 16px;
-                padding: 10px 20px;
-                border-radius: 15px;
-                border: none;
-                cursor: pointer;
-            }
-            .stButton > button:hover {
-                background-color: #03989f; /* Background color on hover */
-                color: #ffffff;
-            }
-            .stButton > button:focus:not(:active) {
-                background-color: #03989f !important; /* Background color when selected */
-                color: #ffffff;
-            }
-            .stButton > button:active {
-                background-color: #03989f !important; /* Background color when active */
-                color: #ffffff;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Create button columns
-        button_col1, button_col2 = st.columns([1, 2])
-
-        with button_col1:
-            if st.button(f"Patient {selected_dim.lower()}"):
-                st.session_state.selected_chart = "chart1"
-
-        # Render the selected chart
-        if st.session_state.selected_chart == "chart1":
-            st.plotly_chart(bar_chart1)
-
-        # Apply the correct CSS class to buttons
-        col1.markdown(f"<style>.stButton > button {{background-color: {'#005458' if st.session_state.selected_chart == 'chart1' else '#005458'};}}</style>", unsafe_allow_html=True)
-    
     elif selected_dim == "Validity":
+        df_validity, _, _, _ = dfs[selected_dim]
+        fig_barh = plot_barh(df_validity, selected_dim, f'Patient {selected_dim}')
+        img_data = plot_to_base64(fig_barh)
+        html_content += f'<img src="{img_data}" alt="Validity Chart" style="width: 100%;">'
 
-        bar_chart1 = plot_barh(data_validity, tablename='table', metric=selected_dim)
+    html_content += '</div>'
 
-        # Default to Chart 1
-        if 'selected_chart' not in st.session_state:
-            st.session_state.selected_chart = "chart1"
+    html_content += '</div>'
 
-        # Define button classes based on selected chart
-        chart1_class = "button selected" if st.session_state.selected_chart == "chart1" else "button"
+    # Column 3: Data Selection and Info
+    html_content += '<div style="width: 20%; float: right; height: 500px;">'
+    # num_variables = dfs[selected_dim][0].shape[1] if selected_dim in ["Completeness", "Validity"] else 'n/a'
 
-        st.markdown(
-            """
-            <style>
-            .stButton > button {
-                margin-right: 5px;
-                font-size: 16px;
-                padding: 10px 20px;
-                border-radius: 15px;
-                border: none;
-                cursor: pointer;
-            }
-            .stButton > button:hover {
-                background-color: #54019e; /* Background color on hover */
-                color: #ffffff;
-            }
-            .stButton > button:focus:not(:active) {
-                background-color: #54019e !important; /* Background color when selected */
-                color: #ffffff;
-            }
-            .stButton > button:active {
-                background-color: #54019e !important; /* Background color when active */
-                color: #ffffff;
-            }
-            </style>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        # Create button columns
-        button_col1, button_col2 = st.columns([1, 2])
-
-        with button_col1:
-            if st.button(f"Patient {selected_dim.lower()}"):
-                st.session_state.selected_chart = "chart1"
-
-        # Render the selected chart
-        if st.session_state.selected_chart == "chart1":
-            st.plotly_chart(bar_chart1)
-
-        # Apply the correct CSS class to buttons
-        col1.markdown(f"<style>.stButton > button {{background-color: {'#32005f' if st.session_state.selected_chart == 'chart1' else '#32005f'};}}</style>", unsafe_allow_html=True)
-    
-with col3:
-
-    if selected_dim == 'Uniqueness':
-        num_variables = 'n/a'
-    elif selected_dim == 'Completeness':
-        num_variables = df_boolean.shape[1]
-    elif selected_dim == 'Validity':
-        num_variables = df_boolean_patients.shape[1]
-    elif 'Accuracy' in selected_dim:
-        num_variables = 'n/a'
-    else:
-        num_variables = 'n/a'
-
-    filename_rawdata = '20240515_Quantium_CaSP.xlsx'
-
-    st.markdown(f"""
+    html_content += f"""
         <div style="
             background-color: #262730;
             padding: 20px;
@@ -594,29 +620,71 @@ with col3:
             flex-direction: column;
             justify-content: flex-start;
             ">
-            <h4>Data Selection</h4
-            >
-            <ul>
-                <li>Source file: <span style="color: orange; font-size:14px;">{filename_rawdata}</span></li>
-                <li>Dataset: <span style="color: orange;">{selected_dataset}</span></li>
-                <li>Patient count: <span style="color: orange;">{"{:,}".format(num_patients)}</span></li>
-                <li>Table count: <span style="color: orange;">{num_tables}</span></li>
-                <li>Sum of records: <span style="color: orange;">{"{:,}".format(num_records)}</span></li>
-                <li>Variable count: <span style="color: orange;">{num_variables}</span></li>
-            </ul>
+            <h3>Data Selection</h3>
+            <p>Source file: <span style="color: orange; word-wrap: break-word; word-break: break-all;">20240515_Quantium_CaSP.xlsx</span></p>
+            <p>Dataset: <span style="color: orange;">CaSP</span></p>
+            <p>Patient count: <span style="color: orange;">{"{:,}".format(num_patients[selected_dim])}</span></p>
+            <p>Table count: <span style="color: orange;">{len(dfs[selected_dim][0])}</span></p>
+            <p>Variable count: <span style="color: orange;">{num_variables[selected_dim]}</span></p>
             <hr>
             <p><strong>Disclaimer</strong></p>
             <p>This is a draft report and for INTERNAL USE ONLY. Numbers do not reflect the latest available dataset in Progeny.</p>
         </div>
-    """, unsafe_allow_html=True)
+    """
+    html_content += '</div>'
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    # Clear float
+    html_content += '<div style="clear: both;"></div>'
 
-    with st.expander('About', expanded=False):
-        st.write('''
-            This report provides a high-level overview of the data quality dimensions across various data tables available in CaSP/MoST Progeny.
-            - Version: 0.1.0
-            - Updated: 13/08/2024
-            - Author: Melvyn Yap
-            - Email: m.yap@omico.org.au
-            ''')
+    return html_content
+
+##############################
+# Main execution
+##############################
+
+# Load data for all dimensions
+dfs = {
+    'Uniqueness': calculate_uniqueness(load_data(dict_filepath_dim['Uniqueness'])),
+    'Completeness': calculate_completeness(load_data(dict_filepath_dim['Completeness'])),
+    'Validity': calculate_validity(load_data(dict_filepath_dim['Validity']))
+}
+
+# Precompute overall scores
+overall_scores = {
+    'Uniqueness': (dfs['Uniqueness'][2], dfs['Uniqueness'][3]),
+    'Completeness': (None, dfs['Completeness'][1]),
+    'Validity': (None, dfs['Validity'][1])
+}
+
+# Precompute number of patients
+num_patients = {
+    'Uniqueness': dfs['Uniqueness'][4],
+    'Completeness': dfs['Completeness'][2],
+    'Validity': dfs['Validity'][2]
+}
+
+# Precompute number of variables
+num_variables = {
+    'Uniqueness': dfs['Uniqueness'][5],
+    'Completeness': dfs['Completeness'][3],
+    'Validity': dfs['Validity'][3]
+}
+
+# Render the sidebar and expander
+selected_dim = render_sidebar()
+render_expander(selected_dim)
+
+# Capture HTML from each page
+html_list = []
+for dim in ['Uniqueness', 'Completeness', 'Validity']:
+    html_list.append(render_main_panel_to_html(dim, dfs, overall_scores, num_patients, num_variables))
+
+# Display the selected dimension
+render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_variables)
+
+# Button to export all pages to a PDF
+st.sidebar.markdown("<hr>", unsafe_allow_html=True)
+if st.sidebar.button("Export to PDF"):
+    pdf_file = export_pdf(html_list)
+    st.sidebar.success(f"PDF ready for download: {pdf_file}")
+    st.sidebar.download_button(label="Download PDF", data=open(pdf_file, 'rb'), file_name=pdf_file, mime="application/pdf")
