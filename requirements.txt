@@ -4,3 +4,4 @@ pdfkit
 plotly
 datetime
 openpyxl
+kaleido
