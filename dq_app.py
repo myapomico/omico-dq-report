@@ -26,10 +26,10 @@ st.set_page_config(
 ##############################
 
 dict_filepath_dim = {
-    'Uniqueness': 'data/20240812_u_bool.xlsx',
-    'Completeness': 'data/20240814_c_bool.xlsx',
-    'Validity': 'data/20240812_v_bool.xlsx',
-    'Accuracy': 'data/20240816_a_ro_bool.xlsx',
+    'Uniqueness': 'data/20240827_u_bool.xlsx',
+    'Completeness': 'data/20240827_c_bool.xlsx',
+    'Validity': 'data/20240827_v_bool.xlsx',
+    'Accuracy': 'data/20240827_a_bool.xlsx',
 }
 
 ##############################
@@ -315,7 +315,7 @@ def calculate_accuracy(dfs):
     df_boolean = pd.concat(
         [df.set_index('PNum').rename(columns=lambda col: f"{sheet_name}.{col}") for sheet_name, df in dfs.items()],
         axis=1
-    ).fillna(0)
+    ).fillna(1) # Setting blank cells to 1
 
     # Calculate overall accuracy
     overall_accuracy = (df_boolean.sum().sum() / df_boolean.size) * 100
@@ -401,47 +401,49 @@ def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_varia
         if selected_dim == "Uniqueness":
             df_record_uniqueness, df_patient_uniqueness, _, _, _, _ = dfs[selected_dim]
             
-            # Radio button for selecting the type of uniqueness to display with custom styling
-            st.markdown("""
-                <style>
-                .radio-container {
-                    display: flex;
-                    justify-content: center;
-                    gap: 10px;
-                }
-                .radio-container label {
-                    display: inline-block;
-                    padding: 10px 20px;
-                    border-radius: 20px;
-                    border: 2px solid #9E024d;
-                    cursor: pointer;
-                    font-weight: bold;
-                    color: white;
-                }
-                .radio-container input[type="radio"] {
-                    display: none;
-                }
-                .radio-container input[type="radio"]:checked + label {
-                    background-color: #9E024d;
-                    color: white;
-                }
-                </style>
-            """, unsafe_allow_html=True)
+            # # Radio button for selecting the type of uniqueness to display with custom styling
+            # st.markdown("""
+            #     <style>
+            #     .radio-container {
+            #         display: flex;
+            #         justify-content: center;
+            #         gap: 10px;
+            #     }
+            #     .radio-container label {
+            #         display: inline-block;
+            #         padding: 10px 20px;
+            #         border-radius: 20px;
+            #         border: 2px solid #9E024d;
+            #         cursor: pointer;
+            #         font-weight: bold;
+            #         color: white;
+            #     }
+            #     .radio-container input[type="radio"] {
+            #         display: none;
+            #     }
+            #     .radio-container input[type="radio"]:checked + label {
+            #         background-color: #9E024d;
+            #         color: white;
+            #     }
+            #     </style>
+            # """, unsafe_allow_html=True)
 
             # Adding a non-empty label and hiding it
-            uniqueness_type = st.radio(
-                "Uniqueness Type Selection",
-                ("Record Uniqueness", "Patient Uniqueness"),
-                index=0,
-                key="uniqueness_type",
-                label_visibility="collapsed"  # This hides the label but still satisfies the accessibility requirement
-            )
+            # uniqueness_type = st.radio(
+            #     "Uniqueness Type Selection",
+            #     ("Record Uniqueness", "Patient Uniqueness"),
+            #     index=0,
+            #     key="uniqueness_type",
+            #     label_visibility="collapsed"  # This hides the label but still satisfies the accessibility requirement
+            # )
 
-            # Display one of the two bar charts based on the selected option
-            if uniqueness_type == "Record Uniqueness":
-                st.plotly_chart(plot_barh(df_record_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, uniqueness_type))
-            else:
-                st.plotly_chart(plot_barh(df_patient_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, uniqueness_type))
+            # # Display one of the two bar charts based on the selected option
+            # if uniqueness_type == "Record Uniqueness":
+            #     st.plotly_chart(plot_barh(df_record_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, uniqueness_type))
+            # else:
+            #     st.plotly_chart(plot_barh(df_patient_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, uniqueness_type))
+
+            st.plotly_chart(plot_barh(df_record_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, "Record Uniqueness"))
 
         elif selected_dim == "Completeness":
             df_completeness, _, _, _ = dfs[selected_dim]
@@ -469,7 +471,7 @@ def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_varia
                 ">
                 <h3 style="color: white;">Data Selection</h3>
                 <ul>
-                    <li>Source file: <span style="color: orange; word-wrap: break-word; word-break: break-all;">20240515_Quantium_CaSP.xlsx</span></li>
+                    <li>Source file: <span style="color: orange; word-wrap: break-word; word-break: break-all;">20240730_Quantium_CaSP.xlsx</span></li>
                     <li>Dataset: <span style="color: orange;">CaSP</span></li>
                     <li>Patient count: <span style="color: orange;">{"{:,}".format(num_patients[selected_dim])}</span></li>
                     <li>Table count: <span style="color: orange;">{len(dfs[selected_dim][0])}</span></li>
@@ -486,8 +488,8 @@ def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_varia
         with st.expander('About', expanded=False):
             st.write('''
                 This report provides a high-level overview of the data quality dimensions across various data tables available in CaSP/MoST Progeny.
-                - Version: 0.1.1
-                - Updated: 15/08/2024
+                - Version: 0.1.2
+                - Updated: 27/08/2024
                 - Author: Melvyn Yap
                 - Email: m.yap@omico.org.au
             ''')
@@ -627,10 +629,10 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
         img_data_record = plot_to_base64(fig_barh_record)
         html_content += f'<img src="{img_data_record}" alt="Record Uniqueness Chart" style="width: 100%;">'
 
-        # Display Patient Uniqueness bar chart
-        fig_barh_patient = plot_barh(df_patient_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, f'Patient {selected_dim}')
-        img_data_patient = plot_to_base64(fig_barh_patient)
-        html_content += f'<img src="{img_data_patient}" alt="Patient Uniqueness Chart" style="width: 100%;">'
+        # # Display Patient Uniqueness bar chart
+        # fig_barh_patient = plot_barh(df_patient_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, f'Patient {selected_dim}')
+        # img_data_patient = plot_to_base64(fig_barh_patient)
+        # html_content += f'<img src="{img_data_patient}" alt="Patient Uniqueness Chart" style="width: 100%;">'
 
     elif selected_dim == "Completeness":
         df_completeness, _, _, _ = dfs[selected_dim]
@@ -671,7 +673,7 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
             justify-content: flex-start;
             ">
             <h3>Data Selection</h3>
-            <p>Source file: <span style="color: orange; word-wrap: break-word; word-break: break-all;">20240515_Quantium_CaSP.xlsx</span></p>
+            <p>Source file: <span style="color: orange; word-wrap: break-word; word-break: break-all;">20240730_Quantium_CaSP.xlsx</span></p>
             <p>Dataset: <span style="color: orange;">CaSP</span></p>
             <p>Patient count: <span style="color: orange;">{"{:,}".format(num_patients[selected_dim])}</span></p>
             <p>Table count: <span style="color: orange;">{len(dfs[selected_dim][0])}</span></p>
@@ -702,7 +704,8 @@ dfs = {
 
 # Precompute overall scores
 overall_scores = {
-    'Uniqueness': (dfs['Uniqueness'][2], dfs['Uniqueness'][3]),
+    # 'Uniqueness': (dfs['Uniqueness'][2], dfs['Uniqueness'][3]),
+    'Uniqueness': (dfs['Uniqueness'][2], None),
     'Completeness': (None, dfs['Completeness'][1]),
     'Validity': (None, dfs['Validity'][1]),
     'Accuracy': (None, dfs['Accuracy'][1])
@@ -739,8 +742,8 @@ html_list = [
             This report provides a high-level overview of the data quality dimensions across various data tables available in CaSP/MoST Progeny.
         </p>
         <div style="text-align: center; font-size: 16px; margin-top: 50px;">
-            <p><strong>Version:</strong> 0.1.1</p>
-            <p><strong>Updated:</strong> 15/08/2024</p>
+            <p><strong>Version:</strong> 0.1.2</p>
+            <p><strong>Updated:</strong> 27/08/2024</p>
             <p><strong>Author:</strong> Melvyn Yap</p>
             <p><strong>Email:</strong> <a href="mailto:m.yap@omico.org.au">m.yap@omico.org.au</a></p>
         </div>
