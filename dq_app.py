@@ -15,8 +15,8 @@ import pickle
 # Page configuration
 ##############################
 
-version_number = "0.1.3"
-date_updated = "10/09/2024"
+version_number = "0.1.4"
+date_updated = "11/09/2024"
 author_name = "Melvyn Yap"
 author_email = "m.yap@omico.org.au"
 
@@ -24,33 +24,34 @@ disclaimer_body = "Numbers may not reflect the latest available dataset in Proge
 
 explanations = {
     "Uniqueness": '''
-        <span style="color: #db0069; font-weight: bold;">Uniqueness</span> 
-        ensures that each data entry is distinct and not duplicated within the 
-        dataset, maintaining the integrity of unique identifiers.
+        <span style="color: #db0069; font-weight: bold;">Uniqueness</span> ensures 
+        that each data record is distinct and not duplicated within the table, 
+        preserving the integrity of unique identifiers, which may consist of 
+        composite variables.
         <br><br>More details: 
         <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
         CaSP+Data+Quality+Architecture+DQv2#Uniqueness">Confluence</a>
     ''',
     "Completeness": '''
         <span style="color: #00c9d3; font-weight: bold;">Completeness</span> 
-        measures the extent to which all required data elements are present, 
-        ensuring that no necessary information is missing.
+        measures the extent to which all required data are populated.
         <br><br>More details: 
         <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
         CaSP+Data+Quality+Architecture+DQv2#Completeness">Confluence</a>
     ''',
     "Validity": '''
-        <span style="color: #923bdf; font-weight: bold;">Validity</span> assesses 
-        whether the data conforms to predefined formats, rules, or constraints, 
-        ensuring it is accurate and usable according to the defined standards.
+        <span style="color: #923bdf; font-weight: bold;">Validity</span> evaluates 
+        whether the data adheres to predefined data types, such as numeric, date, 
+        dropdown, string, link, or boolean, and ensures that dropdown variables 
+        match the specified allowed values.
         <br><br>More details: 
         <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
         CaSP+Data+Quality+Architecture+DQv2#Validity">Confluence</a>
     ''',
     "Accuracy": '''
         <span style="color: #9e7b01; font-weight: bold;">Accuracy</span> evaluates 
-        the correctness of the data in relation to the real-world or source 
-        information it represents, ensuring it is reliable and precise.
+        the correctness of data by comparing it to real-world or source information, 
+        ensuring that it falls within specified minimum and maximum ranges.
         <br><br>More details: 
         <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
         CaSP+Data+Quality+Architecture+DQv2#Accuracy">Confluence</a>
@@ -69,13 +70,13 @@ st.set_page_config(
 ##############################
 
 dict_filepath_dim = {
-    'Uniqueness': 'data/20240910_Uniqueness.pkl',
-    'Completeness': 'data/20240910_Completeness.pkl',
-    'Validity': 'data/20240910_Validity.pkl',
-    'Accuracy': 'data/20240910_Accuracy.pkl',
+    'Uniqueness': 'data/20240911_Uniqueness.pkl',
+    'Completeness': 'data/20240911_Completeness.pkl',
+    'Validity': 'data/20240911_Validity.pkl',
+    'Accuracy': 'data/20240911_Accuracy.pkl',
 }
 
-filepath_metadata = 'data/20240910_metadata.pkl'
+filepath_metadata = 'data/20240911_metadata.pkl'
 
 ##############################
 # Define functions
