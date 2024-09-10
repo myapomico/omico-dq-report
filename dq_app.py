@@ -442,7 +442,6 @@ def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_varia
             st.plotly_chart(plot_barh(df_accuracy, selected_dim, f'Patient {selected_dim}'))
 
     with col3:
-        # num_variables = dfs[selected_dim][0].shape[1] if selected_dim in ["Completeness", "Validity"] else 'n/a'
 
         st.markdown(f"""
             <div style="
@@ -481,6 +480,43 @@ def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_varia
                 - Author: {author_name}
                 - Email: {author_email}
             ''')
+    
+    ########################
+
+    st.markdown("""
+        <h3 style="margin-bottom: 5px;">Evaluated Tables and Variables</h3>
+        <hr style="margin-top: 0; border: 1px solid #333;">
+    """, unsafe_allow_html=True)
+
+    # Create two columns layout, the first for the radio button, the second for the list of columns
+    col11, col12 = st.columns([1, 3])
+
+    # Left column for the radio button
+    with col11:
+        # Radio button for selecting a DataFrame
+        selected_df_label = st.radio(
+            "Tables", 
+            list(dfs_raw[selected_dim].keys()), 
+            index=0  # Default to the first dataframe
+        )
+
+    # Right column for displaying the column names
+    with col12:
+        # Get the selected dataframe based on radio button selection
+        selected_df = dfs_raw[selected_dim][selected_df_label]
+
+        # Display the column names as a styled list
+        st.markdown(f"Variables for Table {selected_df_label}")
+        html_list = "<ul style='list-style-type: disc; padding-left: 20px;'>"
+        for column in selected_df.columns:
+            if column!='is_duplicate':
+                html_list += f"<li style='margin-bottom: 5px'>{column}</li>"
+        html_list += "</ul>"
+
+        # Render the styled HTML list
+        st.markdown(html_list, unsafe_allow_html=True)
+
+    ########################
 
 def export_pdf(html_list):
     """Combine HTML content from all pages into a single PDF."""
@@ -598,11 +634,6 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
         img_data_record = plot_to_base64(fig_barh_record)
         html_content += f'<img src="{img_data_record}" alt="Record Uniqueness Chart" style="width: 100%;">'
 
-        # # Display Patient Uniqueness bar chart
-        # fig_barh_patient = plot_barh(df_patient_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, f'Patient {selected_dim}')
-        # img_data_patient = plot_to_base64(fig_barh_patient)
-        # html_content += f'<img src="{img_data_patient}" alt="Patient Uniqueness Chart" style="width: 100%;">'
-
     elif selected_dim == "Completeness":
         df_completeness, _, _, _ = dfs[selected_dim]
         fig_barh = plot_barh(df_completeness, selected_dim, f'Patient {selected_dim}')
@@ -666,11 +697,18 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
 ##############################
 
 # Load data for all dimensions
+dfs_raw = {
+    'Uniqueness': load_data(dict_filepath_dim['Uniqueness']),
+    'Completeness': load_data(dict_filepath_dim['Completeness']),
+    'Validity': load_data(dict_filepath_dim['Validity']),
+    'Accuracy': load_data(dict_filepath_dim['Accuracy'])
+}
+
 dfs = {
-    'Uniqueness': calculate_uniqueness(load_data(dict_filepath_dim['Uniqueness'])),
-    'Completeness': calculate_completeness(load_data(dict_filepath_dim['Completeness'])),
-    'Validity': calculate_validity(load_data(dict_filepath_dim['Validity'])),
-    'Accuracy': calculate_accuracy(load_data(dict_filepath_dim['Accuracy']))
+    'Uniqueness': calculate_uniqueness(dfs_raw['Uniqueness']),
+    'Completeness': calculate_completeness(dfs_raw['Completeness']),
+    'Validity': calculate_validity(dfs_raw['Validity']),
+    'Accuracy': calculate_accuracy(dfs_raw['Accuracy'])
 }
 
 list_sources = load_data(filepath_metadata)
