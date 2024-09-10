@@ -657,7 +657,7 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
     html_content += '</div>'
 
     # Column 3: Data Selection and Info
-    html_content += '<div style="width: 20%; float: right; height: 600px;">'
+    html_content += '<div style="width: 20%; float: right; height: 700px;">'
     # num_variables = dfs[selected_dim][0].shape[1] if selected_dim in ["Completeness", "Validity"] else 'n/a'
 
     html_content += f"""
