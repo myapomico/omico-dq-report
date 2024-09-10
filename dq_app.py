@@ -9,14 +9,57 @@ import pdfkit
 import plotly.io as pio
 import base64
 import datetime
+import pickle
 
 ##############################
 # Page configuration
 ##############################
 
+version_number = "0.1.3"
+date_updated = "10/09/2024"
+author_name = "Melvyn Yap"
+author_email = "m.yap@omico.org.au"
+
+disclaimer_body = "Numbers may not reflect the latest available dataset in Progeny."
+
+explanations = {
+    "Uniqueness": '''
+        <span style="color: #db0069; font-weight: bold;">Uniqueness</span> 
+        ensures that each data entry is distinct and not duplicated within the 
+        dataset, maintaining the integrity of unique identifiers.
+        <br><br>More details: 
+        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
+        CaSP+Data+Quality+Architecture+DQv2#Uniqueness">Confluence</a>
+    ''',
+    "Completeness": '''
+        <span style="color: #00c9d3; font-weight: bold;">Completeness</span> 
+        measures the extent to which all required data elements are present, 
+        ensuring that no necessary information is missing.
+        <br><br>More details: 
+        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
+        CaSP+Data+Quality+Architecture+DQv2#Completeness">Confluence</a>
+    ''',
+    "Validity": '''
+        <span style="color: #923bdf; font-weight: bold;">Validity</span> assesses 
+        whether the data conforms to predefined formats, rules, or constraints, 
+        ensuring it is accurate and usable according to the defined standards.
+        <br><br>More details: 
+        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
+        CaSP+Data+Quality+Architecture+DQv2#Validity">Confluence</a>
+    ''',
+    "Accuracy": '''
+        <span style="color: #9e7b01; font-weight: bold;">Accuracy</span> evaluates 
+        the correctness of the data in relation to the real-world or source 
+        information it represents, ensuring it is reliable and precise.
+        <br><br>More details: 
+        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
+        CaSP+Data+Quality+Architecture+DQv2#Accuracy">Confluence</a>
+    '''
+}
+
 st.set_page_config(
     page_title="Data Quality Report",
-    page_icon="☑️",
+    page_icon="img/q_char_icon.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -26,11 +69,13 @@ st.set_page_config(
 ##############################
 
 dict_filepath_dim = {
-    'Uniqueness': 'data/20240827_u_bool.xlsx',
-    'Completeness': 'data/20240827_c_bool.xlsx',
-    'Validity': 'data/20240827_v_bool.xlsx',
-    'Accuracy': 'data/20240827_a_bool.xlsx',
+    'Uniqueness': 'data/20240910_Uniqueness.pkl',
+    'Completeness': 'data/20240910_Completeness.pkl',
+    'Validity': 'data/20240910_Validity.pkl',
+    'Accuracy': 'data/20240910_Accuracy.pkl',
 }
+
+filepath_metadata = 'data/20240910_metadata.pkl'
 
 ##############################
 # Define functions
@@ -38,9 +83,10 @@ dict_filepath_dim = {
 
 @st.cache_data
 def load_data(filepath):
-    """Load data from the specified Excel file."""
-    excel_file = pd.ExcelFile(filepath)
-    return {sheet_name: pd.read_excel(filepath, sheet_name=sheet_name) for sheet_name in excel_file.sheet_names}
+    """Load data from the specified pickle file."""
+    with open(filepath, 'rb') as f:
+        data = pickle.load(f)
+    return data
 
 def plot_donut_plotly(score, title, selected_dim):
     """Create a donut chart using Plotly Express, with color matching the selected_dim and rounding percentage to 0 decimal."""
@@ -346,27 +392,9 @@ def render_sidebar():
 
     return selected_dim
 
-def render_expander(selected_dim):
+def render_expander(selected_dim, explanations):
     """Render the sidebar expander with explanations."""
     with st.sidebar.expander(f"💡 What is {selected_dim}?"):
-        explanations = {
-            "Uniqueness": '''
-                <span style="color: #db0069; font-weight: bold;">Uniqueness</span> ensures that each data entry is distinct and not duplicated within the dataset, maintaining the integrity of unique identifiers.
-                <br><br>More details: [Confluence](https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Uniqueness)
-            ''',
-            "Completeness": '''
-                <span style="color: #00c9d3; font-weight: bold;">Completeness</span> measures the extent to which all required data elements are present, ensuring that no necessary information is missing.
-                <br><br>More details: [Confluence](https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Completeness)
-            ''',
-            "Validity": '''
-                <span style="color: #923bdf; font-weight: bold;">Validity</span> assesses whether the data conforms to predefined formats, rules, or constraints, ensuring it is accurate and usable according to the defined standards.
-                <br><br>More details: [Confluence](https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Validity)
-            ''',
-            "Accuracy": '''
-                <span style="color: #9e7b01; font-weight: bold;">Accuracy</span> evaluates the correctness of the data in relation to the real-world or source information it represents, ensuring it is reliable and precise.
-                <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Accuracy">Confluence</a>
-            '''
-        }
         st.write(explanations.get(selected_dim, "Explanation not available."), unsafe_allow_html=True)
         
 def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_variables):
@@ -400,48 +428,6 @@ def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_varia
 
         if selected_dim == "Uniqueness":
             df_record_uniqueness, df_patient_uniqueness, _, _, _, _ = dfs[selected_dim]
-            
-            # # Radio button for selecting the type of uniqueness to display with custom styling
-            # st.markdown("""
-            #     <style>
-            #     .radio-container {
-            #         display: flex;
-            #         justify-content: center;
-            #         gap: 10px;
-            #     }
-            #     .radio-container label {
-            #         display: inline-block;
-            #         padding: 10px 20px;
-            #         border-radius: 20px;
-            #         border: 2px solid #9E024d;
-            #         cursor: pointer;
-            #         font-weight: bold;
-            #         color: white;
-            #     }
-            #     .radio-container input[type="radio"] {
-            #         display: none;
-            #     }
-            #     .radio-container input[type="radio"]:checked + label {
-            #         background-color: #9E024d;
-            #         color: white;
-            #     }
-            #     </style>
-            # """, unsafe_allow_html=True)
-
-            # Adding a non-empty label and hiding it
-            # uniqueness_type = st.radio(
-            #     "Uniqueness Type Selection",
-            #     ("Record Uniqueness", "Patient Uniqueness"),
-            #     index=0,
-            #     key="uniqueness_type",
-            #     label_visibility="collapsed"  # This hides the label but still satisfies the accessibility requirement
-            # )
-
-            # # Display one of the two bar charts based on the selected option
-            # if uniqueness_type == "Record Uniqueness":
-            #     st.plotly_chart(plot_barh(df_record_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, uniqueness_type))
-            # else:
-            #     st.plotly_chart(plot_barh(df_patient_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, uniqueness_type))
 
             st.plotly_chart(plot_barh(df_record_uniqueness.iloc[:, -1].reset_index().rename(columns={'index': 'Table'}), selected_dim, "Record Uniqueness"))
 
@@ -471,7 +457,9 @@ def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_varia
                 ">
                 <h3 style="color: white;">Data Selection</h3>
                 <ul>
-                    <li>Source file: <span style="color: orange; word-wrap: break-word; word-break: break-all;">20240730_Quantium_CaSP.xlsx</span></li>
+                    <li>Data: <span style="color: orange; word-wrap: break-word; word-break: break-all;">{list_sources[0]}</span></li>
+                    <li>Parameters: <span style="color: orange; word-wrap: break-word; word-break: break-all;">{list_sources[1]}</span></li>
+                    <li>Data Dictionary: <span style="color: orange; word-wrap: break-word; word-break: break-all;">{list_sources[2]}</span></li>
                     <li>Dataset: <span style="color: orange;">CaSP</span></li>
                     <li>Patient count: <span style="color: orange;">{"{:,}".format(num_patients[selected_dim])}</span></li>
                     <li>Table count: <span style="color: orange;">{len(dfs[selected_dim][0])}</span></li>
@@ -479,19 +467,19 @@ def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_varia
                 </ul>
                 <hr>
                 <p><strong>Disclaimer</strong></p>
-                <p>This is a draft report and for INTERNAL USE ONLY. Numbers do not reflect the latest available dataset in Progeny.</p>
+                <p>{disclaimer_body}</p>
             </div>
         """, unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
         with st.expander('About', expanded=False):
-            st.write('''
+            st.write(f'''
                 This report provides a high-level overview of the data quality dimensions across various data tables available in CaSP/MoST Progeny.
-                - Version: 0.1.2
-                - Updated: 27/08/2024
-                - Author: Melvyn Yap
-                - Email: m.yap@omico.org.au
+                - Version: {version_number}
+                - Updated: {date_updated}
+                - Author: {author_name}
+                - Email: {author_email}
             ''')
 
 def export_pdf(html_list):
@@ -542,7 +530,7 @@ def plot_to_base64(fig):
     img_base64 = base64.b64encode(img_bytes).decode('ascii')
     return f"data:image/png;base64,{img_base64}"
 
-def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, num_variables):
+def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, num_variables, explanations):
     """Render the main panel to HTML instead of directly to Streamlit."""
     # Apply Arial font globally
     html_content = """
@@ -581,25 +569,6 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
         html_content += f'<img src="{img_data}" alt="Patient {selected_dim} Chart" style="width: 100%;">'
     
     # Add explanation text at the bottom of Column 1
-    explanations = {
-        "Uniqueness": '''
-            <span style="color: #9E024d; font-weight: bold;">Uniqueness</span> ensures that each data entry is distinct and not duplicated within the dataset, maintaining the integrity of unique identifiers.
-            <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Uniqueness">Confluence</a>
-        ''',
-        "Completeness": '''
-            <span style="color: #02989E; font-weight: bold;">Completeness</span> measures the extent to which all required data elements are present, ensuring that no necessary information is missing.
-            <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Completeness">Confluence</a>
-        ''',
-        "Validity": '''
-            <span style="color: #711abe; font-weight: bold;">Validity</span> assesses whether the data conforms to predefined formats, rules, or constraints, ensuring it is accurate and usable according to the defined standards.
-            <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Validity">Confluence</a>
-        ''',
-        "Accuracy": '''
-            <span style="color: #9e7b01; font-weight: bold;">Accuracy</span> evaluates the correctness of the data in relation to the real-world or source information it represents, ensuring it is reliable and precise.
-            <br><br>More details: <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/CaSP+Data+Quality+Architecture+DQv2#Accuracy">Confluence</a>
-        '''
-    }
-    
     explanation_html = explanations.get(selected_dim, "Explanation not available.")
     html_content += f'''
         <div style="
@@ -673,14 +642,16 @@ def render_main_panel_to_html(selected_dim, dfs, overall_scores, num_patients, n
             justify-content: flex-start;
             ">
             <h3>Data Selection</h3>
-            <p>Source file: <span style="color: orange; word-wrap: break-word; word-break: break-all;">20240730_Quantium_CaSP.xlsx</span></p>
+            <p>Data: <span style="color: orange; word-wrap: break-word; word-break: break-all;">{list_sources[0]}</span></p>
+            <p>Parameters: <span style="color: orange; word-wrap: break-word; word-break: break-all;">{list_sources[1]}</span></p>
+            <p>Data Dictionary: <span style="color: orange; word-wrap: break-word; word-break: break-all;">{list_sources[2]}</span></p>
             <p>Dataset: <span style="color: orange;">CaSP</span></p>
             <p>Patient count: <span style="color: orange;">{"{:,}".format(num_patients[selected_dim])}</span></p>
             <p>Table count: <span style="color: orange;">{len(dfs[selected_dim][0])}</span></p>
             <p>Variable count: <span style="color: orange;">{num_variables[selected_dim]}</span></p>
             <hr>
             <p><strong>Disclaimer</strong></p>
-            <p>This is a draft report and for INTERNAL USE ONLY. Numbers do not reflect the latest available dataset in Progeny.</p>
+            <p>{disclaimer_body}</p>
         </div>
     """
     html_content += '</div>'
@@ -702,9 +673,10 @@ dfs = {
     'Accuracy': calculate_accuracy(load_data(dict_filepath_dim['Accuracy']))
 }
 
+list_sources = load_data(filepath_metadata)
+
 # Precompute overall scores
 overall_scores = {
-    # 'Uniqueness': (dfs['Uniqueness'][2], dfs['Uniqueness'][3]),
     'Uniqueness': (dfs['Uniqueness'][2], None),
     'Completeness': (None, dfs['Completeness'][1]),
     'Validity': (None, dfs['Validity'][1]),
@@ -729,11 +701,11 @@ num_variables = {
 
 # Render the sidebar and expander
 selected_dim = render_sidebar()
-render_expander(selected_dim)
+render_expander(selected_dim, explanations)
 
 # Capture HTML from each page
 html_list = [
-    """
+    f"""
     <div style="width: 100%; padding: 20px; font-family: Arial, sans-serif;">
         <h1 style="text-align: center; color: #434343; font-size: 80px; margin-bottom: 40px; padding-top: 160px;">
             Data Quality Report
@@ -742,16 +714,16 @@ html_list = [
             This report provides a high-level overview of the data quality dimensions across various data tables available in CaSP/MoST Progeny.
         </p>
         <div style="text-align: center; font-size: 16px; margin-top: 50px;">
-            <p><strong>Version:</strong> 0.1.2</p>
-            <p><strong>Updated:</strong> 27/08/2024</p>
-            <p><strong>Author:</strong> Melvyn Yap</p>
-            <p><strong>Email:</strong> <a href="mailto:m.yap@omico.org.au">m.yap@omico.org.au</a></p>
+            <p><strong>Version:</strong> {version_number}</p>
+            <p><strong>Updated:</strong> {date_updated}</p>
+            <p><strong>Author:</strong> {author_name}</p>
+            <p><strong>Email:</strong> <a href="mailto:{author_email}">{author_email}</a></p>
         </div>
     </div>
     """
 ]
 for dim in ['Uniqueness', 'Completeness', 'Validity', 'Accuracy']:
-    html_list.append(render_main_panel_to_html(dim, dfs, overall_scores, num_patients, num_variables))
+    html_list.append(render_main_panel_to_html(dim, dfs, overall_scores, num_patients, num_variables, explanations))
 
 # Display the selected dimension
 render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_variables)
