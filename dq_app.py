@@ -483,38 +483,41 @@ def render_main_panel(selected_dim, dfs, overall_scores, num_patients, num_varia
     
     ########################
 
-    st.markdown("""
-        <h3 style="margin-bottom: 5px;">Evaluated Tables and Variables</h3>
-        <hr style="margin-top: 0; border: 1px solid #333;">
-    """, unsafe_allow_html=True)
+    if selected_dim != 'Uniqueness':
+        st.markdown("""
+            <h3 style="margin-bottom: 5px;">Evaluated Tables and Variables</h3>
+            <hr style="margin-top: 0; border: 1px solid #333;">
+        """, unsafe_allow_html=True)
 
-    # Create two columns layout, the first for the radio button, the second for the list of columns
-    col11, col12 = st.columns([1, 3])
+        # Create two columns layout, the first for the radio button, the second for the list of columns
+        col11, col12 = st.columns([1, 3])
 
-    # Left column for the radio button
-    with col11:
-        # Radio button for selecting a DataFrame
-        selected_df_label = st.radio(
-            "Tables", 
-            list(dfs_raw[selected_dim].keys()), 
-            index=0  # Default to the first dataframe
-        )
+        # Left column for the radio button
+        with col11:
+            # Radio button for selecting a DataFrame
+            selected_df_label = st.radio(
+                "Tables", 
+                list(dfs_raw[selected_dim].keys()), 
+                index=0  # Default to the first dataframe
+            )
 
-    # Right column for displaying the column names
-    with col12:
-        # Get the selected dataframe based on radio button selection
-        selected_df = dfs_raw[selected_dim][selected_df_label]
+        # Right column for displaying the column names
+        with col12:
+            # Get the selected dataframe based on radio button selection
+            selected_df = dfs_raw[selected_dim][selected_df_label]
 
-        # Display the column names as a styled list
-        st.markdown(f"Variables for Table {selected_df_label}")
-        html_list = "<ul style='list-style-type: disc; padding-left: 20px;'>"
-        for column in selected_df.columns:
-            if column!='is_duplicate':
-                html_list += f"<li style='margin-bottom: 5px'>{column}</li>"
-        html_list += "</ul>"
+            # Display the column names as a styled list
+            st.markdown(f"Variables for Table {selected_df_label}")
+            html_list = "<ul style='list-style-type: disc; padding-left: 20px;'>"
+            for column in selected_df.columns:
+                if column == 'PNum':
+                    continue
+                if column != 'is_duplicate':
+                    html_list += f"<li style='margin-bottom: 5px'>{column}</li>"
+            html_list += "</ul>"
 
-        # Render the styled HTML list
-        st.markdown(html_list, unsafe_allow_html=True)
+            # Render the styled HTML list
+            st.markdown(html_list, unsafe_allow_html=True)
 
     ########################
 
