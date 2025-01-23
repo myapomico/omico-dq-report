@@ -2,6 +2,8 @@
 # Import necessary libraries
 ##############################
 
+import gzip
+
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -15,8 +17,8 @@ import pickle
 # Page configuration
 ##############################
 
-version_number = "0.1.4"
-date_updated = "11/09/2024"
+version_number = "0.1.5"
+date_updated = "23/01/2025"
 author_name = "Melvyn Yap"
 author_email = "m.yap@omico.org.au"
 
@@ -29,15 +31,13 @@ explanations = {
         preserving the integrity of unique identifiers, which may consist of 
         composite variables.
         <br><br>More details: 
-        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
-        CaSP+Data+Quality+Architecture+DQv2#Uniqueness">Confluence</a>
+        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/455803003/Data+Quality+Assessment+Dashboard+User+Guide#Uniqueness">Uniqueness</a>
     ''',
     "Completeness": '''
         <span style="color: #00c9d3; font-weight: bold;">Completeness</span> 
         measures the extent to which all required data are populated.
         <br><br>More details: 
-        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
-        CaSP+Data+Quality+Architecture+DQv2#Completeness">Confluence</a>
+        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/455803003/Data+Quality+Assessment+Dashboard+User+Guide#Completeness">Completeness</a>
     ''',
     "Validity": '''
         <span style="color: #923bdf; font-weight: bold;">Validity</span> evaluates 
@@ -45,16 +45,14 @@ explanations = {
         dropdown, string, link, or boolean, and ensures that dropdown variables 
         match the specified allowed values.
         <br><br>More details: 
-        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
-        CaSP+Data+Quality+Architecture+DQv2#Validity">Confluence</a>
+        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/455803003/Data+Quality+Assessment+Dashboard+User+Guide#Validity">Validity</a>
     ''',
     "Accuracy": '''
         <span style="color: #9e7b01; font-weight: bold;">Accuracy</span> evaluates 
         the correctness of data by comparing it to real-world or source information, 
         ensuring that it falls within specified minimum and maximum ranges.
         <br><br>More details: 
-        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/117866498/
-        CaSP+Data+Quality+Architecture+DQv2#Accuracy">Confluence</a>
+        <a href="https://omico.atlassian.net/wiki/spaces/RWD/pages/455803003/Data+Quality+Assessment+Dashboard+User+Guide#Accuracy">Accuracy</a>
     '''
 }
 
@@ -70,13 +68,13 @@ st.set_page_config(
 ##############################
 
 dict_filepath_dim = {
-    'Uniqueness': 'data/20240911_Uniqueness.pkl',
-    'Completeness': 'data/20240911_Completeness.pkl',
-    'Validity': 'data/20240911_Validity.pkl',
-    'Accuracy': 'data/20240911_Accuracy.pkl',
+    'Uniqueness': 'data/20250123_Uniqueness.pkl',
+    'Completeness': 'data/20250123_Completeness.pkl',
+    'Validity': 'data/20250123_Validity.pkl.gz',
+    'Accuracy': 'data/20250123_Accuracy.pkl',
 }
 
-filepath_metadata = 'data/20240911_metadata.pkl'
+filepath_metadata = 'data/20250123_metadata.pkl'
 
 ##############################
 # Define functions
@@ -84,9 +82,13 @@ filepath_metadata = 'data/20240911_metadata.pkl'
 
 @st.cache_data
 def load_data(filepath):
-    """Load data from the specified pickle file."""
-    with open(filepath, 'rb') as f:
-        data = pickle.load(f)
+    """Load data from a pickle or gzip-compressed pickle file."""
+    if filepath.endswith('.gz'):
+        with gzip.open(filepath, 'rb') as f:
+            data = pickle.load(f)
+    else:
+        with open(filepath, 'rb') as f:
+            data = pickle.load(f)
     return data
 
 def plot_donut_plotly(score, title, selected_dim):
@@ -209,7 +211,7 @@ def plot_barh(data, metric, chart_title=None):
     # Add percentage annotations
     for _, row in data_summary[data_summary['Status'] == status_positive].iterrows():
         # Determine text color based on bar position (inside bar -> white, outside bar -> black)
-        text_color = "white" if row['Percentage'] > 50 else "black"
+        text_color = "white"
         fig.add_annotation(
             x=row['Percentage'],
             y=row['Table'],

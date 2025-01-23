@@ -6,3 +6,4 @@ plotly
 datetime
 openpyxl
 kaleido
+gzip
