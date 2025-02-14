@@ -14,7 +14,7 @@ import datetime
 import pickle
 
 ##############################
-# Page configuration
+# Page configuration 
 ##############################
 
 version_number = "0.1.7"
