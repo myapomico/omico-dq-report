@@ -64,7 +64,7 @@ st.set_page_config(
 )
 
 ##############################
-# Specify input data
+# Specify input data 
 ##############################
 
 dict_filepath_dim = {
