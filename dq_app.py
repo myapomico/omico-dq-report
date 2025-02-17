@@ -74,7 +74,7 @@ dict_filepath_dim = {
     'Accuracy': 'data/20250217_Accuracy.pkl',
 }
 
-filepath_metadata = 'data/20250214_metadata.pkl'
+filepath_metadata = 'data/20250217_metadata.pkl'
 
 ##############################
 # Define functions
