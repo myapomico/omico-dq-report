@@ -68,13 +68,13 @@ st.set_page_config(
 ##############################
 
 dict_filepath_dim = {
-    'Uniqueness': 'data/20250217_Uniqueness.pkl',
-    'Completeness': 'data/20250217_Completeness.pkl',
-    'Validity': 'data/20250217_Validity.pkl.gz',
-    'Accuracy': 'data/20250217_Accuracy.pkl',
+    'Uniqueness': 'data/20250219_Uniqueness.pkl',
+    'Completeness': 'data/20250219_Completeness.pkl',
+    'Validity': 'data/20250219_Validity.pkl.gz',
+    'Accuracy': 'data/20250219_Accuracy.pkl',
 }
 
-filepath_metadata = 'data/20250217_metadata.pkl'
+filepath_metadata = 'data/20250219_metadata.pkl'
 
 ##############################
 # Define functions
