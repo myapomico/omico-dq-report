@@ -1,5 +1,5 @@
 ##############################
-# Import necessary libraries 
+# Import necessary libraries
 ##############################
 
 import gzip
@@ -17,8 +17,8 @@ import pickle
 # Page configuration 
 ##############################
 
-version_number = "0.1.7"
-date_updated = "14/02/2025"
+version_number = "0.1.8"
+date_updated = "20/02/2025"
 author_name = "Melvyn Yap"
 author_email = "m.yap@omico.org.au"
 
@@ -68,13 +68,13 @@ st.set_page_config(
 ##############################
 
 dict_filepath_dim = {
-    'Uniqueness': 'data/20250219_Uniqueness.pkl',
-    'Completeness': 'data/20250219_Completeness.pkl',
-    'Validity': 'data/20250219_Validity.pkl.gz',
-    'Accuracy': 'data/20250219_Accuracy.pkl',
+    'Uniqueness': 'data/20250220_Uniqueness.pkl',
+    'Completeness': 'data/20250220_Completeness.pkl',
+    'Validity': 'data/20250220_Validity.pkl.gz',
+    'Accuracy': 'data/20250220_Accuracy.pkl',
 }
 
-filepath_metadata = 'data/20250219_metadata.pkl'
+filepath_metadata = 'data/20250220_metadata.pkl'
 
 ##############################
 # Define functions
@@ -134,9 +134,9 @@ def plot_donut_plotly(score, title, selected_dim):
         width=180,
         margin=dict(t=0, b=10, l=0, r=0),
         annotations=[dict(
-            text=f"{score:.0f}%",
+            text=f"{score:.1f}%",
             x=0.5, y=0.5,
-            font_size=40,
+            font_size=34,
             showarrow=False,
             font=dict(color=dim_color, family='Arial Black')
         )],
